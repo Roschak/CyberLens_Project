@@ -1,0 +1,207 @@
+@page "/ai-analytics"
+@inject AiAnalyticsService Ai
+@inject AnalyticsService Analytics
+@inject MarkdownService Md
+@inject IJSRuntime JS
+
+<PageTitle>AI Analytics — CyberLens</PageTitle>
+
+<PageHeader Title="AI Analytics" Eyebrow="llm-generated intelligence brief">
+    @if (_insight is not null) { <span class="tag-chip">model: @_insight.Model</span> }
+    <button class="btn accent" @onclick="Generate" disabled="@_generating">
+        @if (_generating) { <span class="spin" style="width:16px;height:16px;border-width:2px"></span> <text>Menganalisis…</text> }
+        else { <Icon Name="sparkles" Size="16" /> <text>Buat ulang insight</text> }
+    </button>
+</PageHeader>
+
+@if (_stats is not null)
+{
+    <div class="grid cols-4" style="margin-bottom:18px">
+        <StatTile Field="post dianalisis" Value="@_stats.Posts7d.ToString("N0")" Sub="7 hari terakhir" />
+        <StatTile Field="sumber" Value="@_stats.ActiveSources.ToString()" Sub="@($"{_stats.TotalPosts:N0} total")" />
+        <StatTile Field="sentimen rata-rata" Value="@_stats.AvgSentiment7d.ToString("+0.00;-0.00;0.00")" Sub="@($"kategori: {_stats.TopCategory7d}")" />
+        <StatTile Field="sinyal dark web" Value="@_stats.DarkWebMentions7d.ToString()" Sub="@($"{_stats.UnreadAlerts} alert belum dibaca")" Alert="@(_stats.DarkWebMentions7d > 0)" />
+    </div>
+}
+
+<div class="grid cols-3" style="margin-bottom:18px">
+    <!-- AI brief -->
+    <div class="card" style="grid-column:span 2">
+        <div class="card-h">
+            <span class="field">// ai_brief</span><h3>Brief Intelijen AI</h3>
+            <div class="spacer" style="flex:1"></div>
+            @if (_insight is { Ok: true })
+            {
+                <span class="badge @RiskClass(_insight.RiskLevel)" style="font-size:11px">
+                    <span class="d" style="background:@RiskColor(_insight.RiskLevel)"></span>RISIKO: @_insight.RiskLevel.ToUpper()
+                </span>
+            }
+        </div>
+        <div class="card-b">
+            @if (_generating && _insight is null)
+            {
+                <div class="center-load"><div class="spin"></div></div>
+                <div class="empty" style="padding-top:0">Model @(_modelHint) sedang menganalisis data hasil crawl…</div>
+            }
+            else if (_insight is null)
+            {
+                <div class="empty">Klik "Buat insight" untuk menghasilkan brief.</div>
+            }
+            else if (!_insight.Ok)
+            {
+                <div class="card pad" style="border-color:var(--red);box-shadow:none;background:color-mix(in srgb,var(--red) 8%,var(--surface))">
+                    <div style="font-weight:700;margin-bottom:4px">AI belum dapat dijalankan</div>
+                    <div style="font-size:13px;color:var(--ink-soft)">@_insight.Error</div>
+                </div>
+            }
+            else
+            {
+                <!-- Risk gauge -->
+                <div style="margin-bottom:16px">
+                    <div class="progress-track" style="height:14px">
+                        <div class="progress-fill" style="width:@RiskPct(_insight.RiskLevel)%;background:@RiskColor(_insight.RiskLevel)"></div>
+                    </div>
+                    <div class="mono" style="font-size:11px;color:var(--ink-mute);margin-top:5px">@_insight.RiskRationale</div>
+                </div>
+
+                <div class="md" style="font-size:14.5px;line-height:1.6;margin-bottom:18px">@Md.ToHtml(_insight.Summary)</div>
+
+                @if (_insight.Findings.Count > 0)
+                {
+                    <div class="mono" style="font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:8px">// temuan kunci</div>
+                    <div style="margin-bottom:18px">
+                        @foreach (var f in _insight.Findings)
+                        {
+                            <div class="row" style="align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1.5px solid var(--line)">
+                                <span style="color:var(--accent);font-weight:800">›</span><span style="font-size:13.5px">@f</span>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (_insight.TopThreats.Count > 0)
+                {
+                    <div class="mono" style="font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:8px">// ancaman utama</div>
+                    <div class="wrap" style="margin-bottom:18px">
+                        @foreach (var t in _insight.TopThreats)
+                        {
+                            <div class="card pad" style="box-shadow:var(--shadow-sm);flex:1;min-width:200px;border-color:var(--red)">
+                                <div style="font-weight:700;font-size:13.5px;margin-bottom:2px">⚠ @t.Topic</div>
+                                <div style="font-size:12.5px;color:var(--ink-soft)">@t.Reason</div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_insight.Outlook))
+                {
+                    <div class="mono" style="font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:6px">// prospek 7 hari</div>
+                    <div class="md" style="font-size:13.5px;line-height:1.55;color:var(--ink-soft)">@Md.ToHtml(_insight.Outlook)</div>
+                }
+            }
+        </div>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="card">
+        <div class="card-h"><span class="field">// rekomendasi</span><h3>Rekomendasi AI</h3></div>
+        <div class="card-b">
+            @if (_insight is { Ok: true, Recommendations.Count: > 0 })
+            {
+                @foreach (var (r, i) in _insight.Recommendations.Select((r, i) => (r, i)))
+                {
+                    <div class="row" style="align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1.5px solid var(--line)">
+                        <span class="mono" style="font-weight:800;color:var(--accent)">@((i + 1).ToString("00"))</span>
+                        <span style="font-size:13.5px">@r</span>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="empty">Rekomendasi akan muncul setelah analisis.</div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Supporting data visualizations -->
+<div class="grid cols-3" style="margin-bottom:18px">
+    <div class="card" style="grid-column:span 2">
+        <div class="card-h"><span class="field">// volume_forecast</span><h3>Volume &amp; Prediksi</h3></div>
+        <div class="card-b"><div id="ai-forecast" class="chart-holder"></div></div>
+    </div>
+    <div class="card">
+        <div class="card-h"><span class="field">// sentimen</span><h3>Sebaran Sentimen</h3></div>
+        <div class="card-b"><div id="ai-sentiment" class="chart-holder"></div></div>
+    </div>
+</div>
+<div class="grid cols-2">
+    <div class="card">
+        <div class="card-h"><span class="field">// kategori</span><h3>Distribusi Kategori</h3></div>
+        <div class="card-b"><div id="ai-cats" class="chart-holder"></div></div>
+    </div>
+    <div class="card">
+        <div class="card-h"><span class="field">// kata_kunci</span><h3>Kata Kunci Populer</h3></div>
+        <div class="card-b"><div id="ai-cloud" class="chart-holder"></div></div>
+    </div>
+</div>
+
+@code {
+    private DashboardStats? _stats;
+    private List<SentimentSlice> _sentiment = new();
+    private List<CategorySlice> _categories = new();
+    private List<ForecastPoint> _forecast = new();
+    private List<WordFreq> _words = new();
+    private AiInsight? _insight;
+    private bool _generating;
+    private bool _drawn;
+    private bool _autoStarted;
+    private string _modelHint = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _stats = await Analytics.GetDashboardStatsAsync();
+        _sentiment = await Analytics.GetSentimentBreakdownAsync(7);
+        _categories = await Analytics.GetCategoryBreakdownAsync(30);
+        _forecast = await Analytics.PredictAsync(30, 7);
+        _words = await Analytics.GetTopKeywordsAsync(7, 40);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (_stats is not null && !_drawn)
+        {
+            _drawn = true;
+            await Draw();
+        }
+        if (first && !_autoStarted)
+        {
+            _autoStarted = true;
+            await Generate(); // auto-run once so the brief is ready on arrival
+        }
+    }
+
+    private async Task Draw()
+    {
+        await JS.InvokeVoidAsync("clTrendChart", "ai-forecast",
+            _forecast.Select(f => new { date = f.Date, value = f.Value, isForecast = f.IsForecast }), new { height = 260 });
+        await JS.InvokeVoidAsync("clDonut", "ai-sentiment", _sentiment, new { height = 240, sentiment = true });
+        await JS.InvokeVoidAsync("clBars", "ai-cats", _categories.Select(c => new { c.Name, c.Count, c.Color }), new { });
+        await JS.InvokeVoidAsync("clWordCloud", "ai-cloud", _words, new { height = 230 });
+    }
+
+    private async Task Generate()
+    {
+        _generating = true; _modelHint = ""; StateHasChanged();
+        _insight = await Ai.GenerateAsync();
+        _generating = false;
+        StateHasChanged();
+    }
+
+    private static string RiskClass(string level) => level.ToLower() switch
+    { "critical" or "high" => "neg", "medium" => "neu", _ => "pos" };
+    private static string RiskColor(string level) => level.ToLower() switch
+    { "critical" => "var(--red)", "high" => "#E8600F", "medium" => "var(--amber)", _ => "var(--pos)" };
+    private static int RiskPct(string level) => level.ToLower() switch
+    { "critical" => 100, "high" => 75, "medium" => 50, _ => 25 };
+}

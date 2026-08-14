@@ -1,0 +1,132 @@
+@page "/feed"
+@inject IDbContextFactory<CyberLensDbContext> DbFactory
+@inject NotificationBus Bus
+@inject MarkdownService Md
+@implements IDisposable
+
+<PageTitle>Live Feed — CyberLens</PageTitle>
+
+<PageHeader Title="Live Feed" Eyebrow="collection stream">
+    <span class="badge pos"><span class="d" style="background:var(--pos)"></span>@_liveCount MASUK</span>
+</PageHeader>
+
+<div class="toolbar">
+    <input class="inp" style="max-width:280px" placeholder="Cari konten…" @bind="_query" @bind:event="oninput" @onkeyup="ApplyFilter" />
+    <div class="seg-toggle">
+        <button class="@(Sent(null))" @onclick='() => SetSentiment(null)'>Semua</button>
+        <button class="@(Sent("positive"))" @onclick='() => SetSentiment("positive")'>Positif</button>
+        <button class="@(Sent("neutral"))" @onclick='() => SetSentiment("neutral")'>Netral</button>
+        <button class="@(Sent("negative"))" @onclick='() => SetSentiment("negative")'>Negatif</button>
+    </div>
+    <select class="inp" style="max-width:190px" @bind="_kindFilter" @bind:after="Reload">
+        <option value="">Semua jenis sumber</option>
+        <option value="News">Berita</option>
+        <option value="SocialMedia">Media Sosial</option>
+        <option value="Blog">Blog</option>
+        <option value="Forum">Forum</option>
+        <option value="Official">Resmi</option>
+        <option value="DarkWeb">Dark Web</option>
+    </select>
+</div>
+
+@if (_loading)
+{
+    <div class="center-load"><div class="spin"></div></div>
+}
+else if (_posts.Count == 0)
+{
+    <div class="card pad"><div class="empty">Tidak ada post yang cocok dengan filter.</div></div>
+}
+else
+{
+    <div class="grid cols-2">
+        @foreach (var p in _posts)
+        {
+            <div class="card pad">
+                <div class="row" style="justify-content:space-between;margin-bottom:8px">
+                    <div class="row" style="gap:8px">
+                        <span class="tag-chip">@p.Source?.Kind</span>
+                        <span class="mono" style="font-size:11px;font-weight:600">@p.Source?.Name</span>
+                    </div>
+                    <span class="badge @SentBadge(p.SentimentLabel)"><span class="d" style="background:@SentColor(p.SentimentLabel)"></span>@p.SentimentLabel</span>
+                </div>
+                <div style="font-size:14px;line-height:1.5;margin-bottom:10px">@p.Content</div>
+                @if (p.Media.Any())
+                {
+                    <div class="wrap" style="margin-bottom:10px">
+                        @foreach (var m in p.Media)
+                        {
+                            @if (m.Kind == MediaKind.Image)
+                            {
+                                <img src="@m.Url" style="max-width:100%;border:2px solid var(--line);border-radius:3px" loading="lazy" />
+                            }
+                            else
+                            {
+                                <span class="tag-chip">▶ @m.Kind</span>
+                            }
+                        }
+                    </div>
+                }
+                <div class="wrap" style="margin-bottom:10px">
+                    @foreach (var tag in p.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries).Take(5))
+                    {
+                        <span class="tag-chip">@tag</span>
+                    }
+                </div>
+                <div class="row mono" style="justify-content:space-between;color:var(--ink-mute);font-size:11.5px">
+                    <span class="mono">@p.Author · @(p.LocationName ?? "—")</span>
+                    <span class="mono">♥ @p.Likes · ↻ @p.Shares · 💬 @p.Comments · @p.PublishedAt.ToLocalTime().ToString("dd/MM HH:mm")</span>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Post> _posts = new();
+    private bool _loading = true;
+    private string _query = "";
+    private string? _sentiment;
+    private string _kindFilter = "";
+    private int _liveCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+        Bus.PostCollected += OnPost;
+    }
+
+    private async Task Reload()
+    {
+        _loading = true; StateHasChanged();
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var q = db.Posts.Include(p => p.Source).Include(p => p.Media).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(_query)) q = q.Where(p => p.Content.Contains(_query));
+        if (!string.IsNullOrWhiteSpace(_sentiment)) q = q.Where(p => p.SentimentLabel == _sentiment);
+        if (!string.IsNullOrWhiteSpace(_kindFilter) && Enum.TryParse<SourceKind>(_kindFilter, out var k))
+            q = q.Where(p => p.Source!.Kind == k);
+        _posts = await q.OrderByDescending(p => p.PublishedAt).Take(40).ToListAsync();
+        _loading = false; StateHasChanged();
+    }
+
+    private Timer? _debounce;
+    private void ApplyFilter()
+    {
+        _debounce?.Dispose();
+        _debounce = new Timer(async _ => await InvokeAsync(Reload), null, 350, Timeout.Infinite);
+    }
+
+    private async Task SetSentiment(string? s) { _sentiment = s; await Reload(); }
+    private string Sent(string? s) => _sentiment == s ? "on" : "";
+
+    private async void OnPost(Post p)
+    {
+        _liveCount++;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static string SentBadge(string s) => s switch { "positive" => "pos", "negative" => "neg", _ => "neu" };
+    private static string SentColor(string s) => s switch { "positive" => "var(--pos)", "negative" => "var(--neg)", _ => "var(--neu)" };
+
+    public void Dispose() { Bus.PostCollected -= OnPost; _debounce?.Dispose(); }
+}

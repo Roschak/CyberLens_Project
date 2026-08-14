@@ -1,0 +1,35 @@
+@implements IDisposable
+@inject NavigationManager Nav
+
+<a href="/@Href" class="@(IsActive ? "active" : "")">
+    <Icon Name="@Icon" Class="ico" />
+    <span>@Label</span>
+    @if (Badge is > 0)
+    {
+        <span class="badge-n">@(Badge > 99 ? "99+" : Badge.ToString())</span>
+    }
+</a>
+
+@code {
+    [Parameter] public string Href { get; set; } = "";
+    [Parameter] public string Icon { get; set; } = "";
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public int? Badge { get; set; }
+
+    protected override void OnInitialized() => Nav.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => InvokeAsync(StateHasChanged);
+
+    private bool IsActive
+    {
+        get
+        {
+            var path = Nav.ToBaseRelativePath(Nav.Uri).Split('?')[0].TrimEnd('/');
+            return string.IsNullOrEmpty(Href)
+                ? string.IsNullOrEmpty(path)
+                : path.Equals(Href, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

@@ -1,0 +1,6 @@
+@inject NavigationManager Nav
+
+@code {
+    protected override void OnInitialized() =>
+        Nav.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(new Uri(Nav.Uri).PathAndQuery)}", forceLoad: true);
+}

@@ -1,0 +1,163 @@
+@page "/globe"
+@inject AnalyticsService Analytics
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Globe 3D Intelijen — CyberLens</PageTitle>
+
+<PageHeader Title="Globe 3D Intelijen" Eyebrow="spatial osint · three.js / webgl">
+    <span class="tag-chip">@_points.Count titik</span>
+    <button class="btn sm" @onclick="Reload"><Icon Name="reset" Size="15" /> Muat ulang</button>
+</PageHeader>
+
+<div class="card" style="overflow:hidden">
+    <div class="card-h">
+        <span class="field">// earth_view</span>
+        <h3>Pemetaan Intelijen Spasial</h3>
+        <div class="spacer" style="flex:1"></div>
+        <div class="seg-toggle">
+            <button class="@(_layers["sentiment"] ? "on" : "")" @onclick='() => Toggle("sentiment")'>Sentimen</button>
+            <button class="@(_layers["source"] ? "on" : "")" @onclick='() => Toggle("source")'>Sumber</button>
+            <button class="@(_layers["events"] ? "on" : "")" @onclick='() => Toggle("events")'>Peristiwa</button>
+            <button class="@(_layers["threat"] ? "on" : "")" @onclick='() => Toggle("threat")'>Ancaman</button>
+        </div>
+        <button class="btn sm ghost" @onclick="ToggleRotate">@(_autoRotate ? "⏸ Rotasi" : "▶ Rotasi")</button>
+    </div>
+
+    <div style="position:relative">
+        <div id="globe-canvas" style="width:100%;height:min(66vh,640px);background:radial-gradient(circle at 50% 40%, #14243a 0%, #0a0f18 70%)"></div>
+
+        @if (_loading)
+        {
+            <div style="position:absolute;inset:0;display:grid;place-items:center"><div class="spin"></div></div>
+        }
+
+        <!-- Legend overlay -->
+        <div style="position:absolute;left:14px;bottom:14px;background:color-mix(in srgb, var(--surface) 82%, transparent);border:2px solid var(--line);border-radius:3px;padding:10px 12px;backdrop-filter:blur(4px)">
+            <div class="mono" style="font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:6px">// legenda</div>
+            @if (_layers["sentiment"] || _layers["events"])
+            {
+                <div class="legend" style="margin:0 0 4px">
+                    <span class="li"><span class="sw" style="background:#2ecc71"></span>Positif</span>
+                    <span class="li"><span class="sw" style="background:#f1c40f"></span>Netral</span>
+                    <span class="li"><span class="sw" style="background:#e74c3c"></span>Negatif</span>
+                </div>
+            }
+            @if (_layers["threat"])
+            {
+                <div class="legend" style="margin:0"><span class="li"><span class="sw" style="background:#ff3020"></span>Bar ancaman (dark web / keamanan)</span></div>
+            }
+            @if (_layers["source"])
+            {
+                <div class="legend" style="margin:0"><span class="li"><span class="sw" style="background:#3987e5"></span>Marker lokasi sumber</span></div>
+            }
+        </div>
+    </div>
+
+    <!-- Timeline overlay -->
+    <div class="card-b" style="border-top:2.5px solid var(--line)">
+        <div class="row" style="gap:14px;flex-wrap:wrap">
+            <button class="btn sm accent" @onclick="TogglePlay" disabled="@_loading">@(_playing ? "⏸ Jeda" : "▶ Putar")</button>
+            <div style="flex:1;min-width:220px">
+                <label class="fld">Timeline — tampilkan hingga: <span class="mono" style="color:var(--ink)">@CurrentDateLabel</span></label>
+                <input type="range" style="width:100%" min="@_minTime" max="@_maxTime" step="3600000"
+                       @bind="_curTime" @bind:event="oninput" @bind:after="OnTimeChanged" />
+            </div>
+            <div class="mono" style="font-size:11px;color:var(--ink-mute);align-self:flex-end">
+                seret globe untuk memutar · scroll untuk zoom
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<GlobePoint> _points = new();
+    private List<GlobeCluster> _clusters = new();
+    private readonly Dictionary<string, bool> _layers = new()
+    { ["sentiment"] = true, ["source"] = false, ["events"] = false, ["threat"] = false };
+    private bool _loading = true;
+    private bool _autoRotate = true;
+    private bool _playing;
+    private long _minTime, _maxTime, _curTime;
+    private bool _needsInit;
+    private System.Threading.Timer? _playTimer;
+
+    private string CurrentDateLabel =>
+        DateTimeOffset.FromUnixTimeMilliseconds(_curTime).LocalDateTime.ToString("dd MMM yyyy HH:mm");
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        _loading = true; StateHasChanged();
+        _points = await Analytics.GetGlobePointsAsync(45, 700);
+        _clusters = await Analytics.GetGlobeClustersAsync(45);
+        if (_points.Count > 0)
+        {
+            _minTime = _points.Min(p => p.TimeMs);
+            _maxTime = _points.Max(p => p.TimeMs);
+            _curTime = _maxTime;
+        }
+        _loading = false;
+        _needsInit = true;
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (_needsInit)
+        {
+            _needsInit = false;
+            await JS.InvokeVoidAsync("clGlobeInit", "globe-canvas",
+                _points.Select(p => new
+                {
+                    p.Lat, p.Lon, p.Location, p.Sentiment, p.SentimentLabel,
+                    p.Category, p.SourceKind, p.SourceName, p.TimeMs, p.Intensity, p.Threat
+                }),
+                _clusters.Select(c => new { c.Lat, c.Lon, c.Location, c.Count, c.AvgSentiment, c.TopCategory }));
+        }
+    }
+
+    private async Task Reload() { await LoadData(); }
+
+    private async Task Toggle(string name)
+    {
+        _layers[name] = !_layers[name];
+        await JS.InvokeVoidAsync("clGlobeToggleLayer", name, _layers[name]);
+    }
+
+    private async Task ToggleRotate()
+    {
+        _autoRotate = !_autoRotate;
+        await JS.InvokeVoidAsync("clGlobeAutoRotate", _autoRotate);
+    }
+
+    private async Task OnTimeChanged() => await JS.InvokeVoidAsync("clGlobeSetMaxTime", _curTime);
+
+    private void TogglePlay()
+    {
+        _playing = !_playing;
+        if (_playing)
+        {
+            if (_curTime >= _maxTime) _curTime = _minTime;
+            var stepMs = Math.Max(3600000L, (_maxTime - _minTime) / 60);
+            _playTimer = new System.Threading.Timer(async _ =>
+            {
+                _curTime = Math.Min(_maxTime, _curTime + stepMs);
+                await InvokeAsync(async () =>
+                {
+                    await JS.InvokeVoidAsync("clGlobeSetMaxTime", _curTime);
+                    StateHasChanged();
+                });
+                if (_curTime >= _maxTime) { _playing = false; _playTimer?.Dispose(); await InvokeAsync(StateHasChanged); }
+            }, null, 0, 120);
+        }
+        else { _playTimer?.Dispose(); }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _playTimer?.Dispose();
+        try { await JS.InvokeVoidAsync("clGlobeDispose"); } catch { }
+    }
+}

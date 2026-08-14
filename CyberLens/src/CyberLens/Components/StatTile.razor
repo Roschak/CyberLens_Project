@@ -1,0 +1,16 @@
+<div class="card stat">
+    <div class="accentbar" style="@(Alert ? "background:var(--red)" : "")"></div>
+    <div class="field">@Field</div>
+    <div class="num">@Value</div>
+    @if (!string.IsNullOrEmpty(Sub))
+    {
+        <div class="sub">@Sub</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Field { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public string? Sub { get; set; }
+    [Parameter] public bool Alert { get; set; }
+}

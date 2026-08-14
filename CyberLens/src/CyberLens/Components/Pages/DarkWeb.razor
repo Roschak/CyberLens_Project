@@ -1,0 +1,56 @@
+@page "/darkweb"
+@inject IDbContextFactory<CyberLensDbContext> DbFactory
+
+<PageTitle>Dark Web Monitoring — CyberLens</PageTitle>
+
+<PageHeader Title="Dark Web Monitoring" Eyebrow="hidden forums &amp; marketplaces">
+    <span class="badge neg"><span class="d" style="background:var(--neg)"></span>RESTRICTED</span>
+</PageHeader>
+
+<div class="card pad" style="margin-bottom:18px;background:color-mix(in srgb, var(--red) 8%, var(--surface));border-color:var(--red)">
+    <div class="row" style="gap:10px">
+        <Icon Name="darkweb" Size="22" />
+        <div>
+            <div style="font-weight:700">Pemantauan sumber tersembunyi</div>
+            <div style="font-size:13px;color:var(--ink-soft)">Indikasi kebocoran data, initial access broker, dan chatter ancaman dari forum & marketplace .onion. Semua entri di bawah adalah data simulasi untuk demonstrasi.</div>
+        </div>
+    </div>
+</div>
+
+@if (_loading) { <div class="center-load"><div class="spin"></div></div> }
+else if (_posts.Count == 0) { <div class="card pad"><div class="empty">Belum ada temuan dark web.</div></div> }
+else
+{
+    <div class="grid cols-2">
+        @foreach (var p in _posts)
+        {
+            <div class="card pad" style="border-color:var(--red)">
+                <div class="row" style="justify-content:space-between;margin-bottom:8px">
+                    <span class="mono" style="font-size:11px;font-weight:600">@p.Source?.Name</span>
+                    <span class="badge neg"><span class="d" style="background:var(--neg)"></span>THREAT</span>
+                </div>
+                <div style="font-size:14px;line-height:1.5;margin-bottom:10px">@p.Content</div>
+                <div class="row" style="justify-content:space-between">
+                    <span class="mono" style="font-size:11px;color:var(--ink-mute)">
+                        actor: <span class="redact">@(new string('█', 6))</span> @p.AuthorHandle
+                    </span>
+                    <span class="mono" style="font-size:11px;color:var(--ink-mute)">@p.PublishedAt.ToLocalTime().ToString("dd/MM HH:mm")</span>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Post> _posts = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        _posts = await db.Posts.Include(p => p.Source)
+            .Where(p => p.Source!.Kind == SourceKind.DarkWeb)
+            .OrderByDescending(p => p.PublishedAt).Take(30).ToListAsync();
+        _loading = false;
+    }
+}

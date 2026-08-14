@@ -1,0 +1,122 @@
+@page "/users"
+@attribute [Authorize(Roles = "Admin")]
+@inject IDbContextFactory<CyberLensDbContext> DbFactory
+@inject AuthService Auth
+@inject AuditService Audit
+
+<PageTitle>Pengguna — CyberLens</PageTitle>
+
+<PageHeader Title="Manajemen Pengguna" Eyebrow="role-based access control">
+    <button class="btn accent" @onclick="() => _adding = !_adding"><Icon Name="plus" Size="16" /> Tambah pengguna</button>
+</PageHeader>
+
+@if (_adding)
+{
+    <div class="card pad" style="margin-bottom:18px">
+        <div class="grid cols-3">
+            <div><label class="fld">Username</label><input class="inp" @bind="_u.Username" /></div>
+            <div><label class="fld">Nama tampilan</label><input class="inp" @bind="_u.DisplayName" /></div>
+            <div><label class="fld">Email</label><input class="inp" @bind="_u.Email" /></div>
+            <div><label class="fld">Password</label><input class="inp" type="password" @bind="_password" /></div>
+            <div>
+                <label class="fld">Role</label>
+                <select class="inp" @bind="_u.Role">
+                    <option value="Viewer">Viewer</option>
+                    <option value="Analyst">Analyst</option>
+                    <option value="Admin">Admin</option>
+                </select>
+            </div>
+            <div style="display:flex;align-items:flex-end"><button class="btn accent" @onclick="Add"><Icon Name="check" Size="16" /> Simpan</button></div>
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="tbl-wrap">
+        <table class="tbl">
+            <thead><tr><th>Pengguna</th><th>Email</th><th>Role</th><th>Login terakhir</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var u in _users)
+                {
+                    <tr>
+                        <td>
+                            <div class="row" style="gap:10px">
+                                <div style="width:32px;height:32px;border:2px solid var(--ink);border-radius:3px;display:grid;place-items:center;font-weight:800;font-size:12px;background:@u.AvatarColor;color:#fff">@Initials(u.DisplayName)</div>
+                                <div>
+                                    <div style="font-weight:600">@u.DisplayName</div>
+                                    <div class="mono" style="font-size:10.5px;color:var(--ink-mute)">@@@u.Username</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>@u.Email</td>
+                        <td><span class="badge @RoleClass(u.Role)">@u.Role</span></td>
+                        <td class="mono" style="font-size:11px">@(u.LastLoginAt?.ToLocalTime().ToString("dd/MM HH:mm") ?? "—")</td>
+                        <td><button class="btn sm ghost" @onclick="() => Toggle(u)">@(u.IsActive ? "AKTIF" : "NONAKTIF")</button></td>
+                        <td>
+                            @if (u.Username != "admin")
+                            {
+                                <button class="btn sm ghost" @onclick="() => Remove(u)"><Icon Name="trash" Size="14" /></button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private List<AppUser> _users = new();
+    private bool _adding;
+    private AppUser _u = NewUser();
+    private string _password = "";
+
+    private static AppUser NewUser() => new() { Role = UserRole.Viewer, AvatarColor = "#1B5FD9" };
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        _users = await db.Users.OrderBy(u => u.Id).ToListAsync();
+    }
+
+    private async Task Add()
+    {
+        if (string.IsNullOrWhiteSpace(_u.Username) || string.IsNullOrWhiteSpace(_password)) return;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        if (await db.Users.AnyAsync(x => x.Username == _u.Username)) return;
+        _u.PasswordHash = PasswordHasher.Hash(_password);
+        if (string.IsNullOrWhiteSpace(_u.DisplayName)) _u.DisplayName = _u.Username;
+        var colors = new[] { "#FF4D00", "#1B5FD9", "#1F8A4C", "#8A4FD3", "#C98500", "#CC3B2E" };
+        _u.AvatarColor = colors[_users.Count % colors.Length];
+        db.Users.Add(_u);
+        await db.SaveChangesAsync();
+        await Audit.LogAsync(Auth.CurrentUsername, "user.create", $"Membuat '{_u.Username}' ({_u.Role})", Auth.CurrentUserId);
+        _u = NewUser(); _password = ""; _adding = false;
+        await Load();
+    }
+
+    private async Task Toggle(AppUser u)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var e = await db.Users.FindAsync(u.Id);
+        if (e is not null && e.Username != "admin") { e.IsActive = !e.IsActive; await db.SaveChangesAsync(); }
+        await Load();
+    }
+
+    private async Task Remove(AppUser u)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var e = await db.Users.FindAsync(u.Id);
+        if (e is not null && e.Username != "admin") { db.Users.Remove(e); await db.SaveChangesAsync(); }
+        await Load();
+    }
+
+    private static string Initials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 ? $"{parts[0][0]}{parts[1][0]}".ToUpper() : name[..Math.Min(2, name.Length)].ToUpper();
+    }
+    private static string RoleClass(UserRole r) => r switch { UserRole.Admin => "neg", UserRole.Analyst => "neu", _ => "pos" };
+}

@@ -1,0 +1,43 @@
+@page "/audit"
+@attribute [Authorize(Roles = "Admin")]
+@inject IDbContextFactory<CyberLensDbContext> DbFactory
+
+<PageTitle>Audit Trail — CyberLens</PageTitle>
+
+<PageHeader Title="Audit Trail" Eyebrow="user activity log" />
+
+@if (_loading) { <div class="center-load"><div class="spin"></div></div> }
+else
+{
+    <div class="card">
+        <div class="tbl-wrap">
+            <table class="tbl">
+                <thead><tr><th>Waktu</th><th>Pengguna</th><th>Aksi</th><th>Detail</th><th>IP</th></tr></thead>
+                <tbody>
+                    @foreach (var l in _logs)
+                    {
+                        <tr>
+                            <td class="mono" style="font-size:11px;white-space:nowrap">@l.CreatedAt.ToLocalTime().ToString("dd/MM/yy HH:mm:ss")</td>
+                            <td style="font-weight:600">@l.Username</td>
+                            <td><span class="tag-chip">@l.Action</span></td>
+                            <td>@l.Detail</td>
+                            <td class="mono" style="font-size:11px;color:var(--ink-mute)">@l.IpAddress</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<AuditLog> _logs = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        _logs = await db.AuditLogs.OrderByDescending(l => l.CreatedAt).Take(150).ToListAsync();
+        _loading = false;
+    }
+}

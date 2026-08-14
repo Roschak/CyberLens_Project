@@ -1,0 +1,85 @@
+@page "/trends"
+@inject AnalyticsService Analytics
+@inject IJSRuntime JS
+
+<PageTitle>Tren & Prediksi — CyberLens</PageTitle>
+
+<PageHeader Title="Tren &amp; Prediksi" Eyebrow="trend intelligence + AI forecast">
+    <input class="inp" style="max-width:220px" placeholder="Filter kata kunci…" @bind="_keyword" @bind:after="Reload" />
+</PageHeader>
+
+<div class="grid cols-3" style="margin-bottom:18px">
+    <div class="card" style="grid-column:span 2">
+        <div class="card-h">
+            <span class="field">// forecast</span>
+            <h3>Volume &amp; Prediksi 7 Hari (Regresi Linear)</h3>
+            <div class="spacer" style="flex:1"></div>
+            <span class="mono" style="font-size:11px;color:var(--ink-mute)">— aktual · ┄ prediksi</span>
+        </div>
+        <div class="card-b"><div id="trend-forecast" class="chart-holder"></div></div>
+    </div>
+    <div class="card">
+        <div class="card-h"><span class="field">// naik_daun</span><h3>Topik Trending</h3></div>
+        <div class="card-b" style="max-height:360px;overflow-y:auto">
+            @if (_trending.Count == 0) { <div class="empty">Belum cukup data.</div> }
+            else
+            {
+                @foreach (var t in _trending)
+                {
+                    <div style="padding:9px 0;border-bottom:1.5px solid var(--line)">
+                        <div class="row" style="justify-content:space-between">
+                            <span class="tag-chip">@t.Topic</span>
+                            <span class="mono" style="font-size:12px;font-weight:700;color:@(t.GrowthPct >= 0 ? "var(--pos)" : "var(--neg)")">@t.GrowthPct.ToString("+0.0;-0.0")%</span>
+                        </div>
+                        <div class="mono" style="font-size:10.5px;color:var(--ink-mute);margin-top:3px">@t.Recent kini · @t.Previous sebelumnya</div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+<div class="grid cols-2">
+    <div class="card">
+        <div class="card-h"><span class="field">// word_cloud</span><h3>Peta Kata Kunci</h3></div>
+        <div class="card-b"><div id="trend-cloud" class="chart-holder"></div></div>
+    </div>
+    <div class="card">
+        <div class="card-h"><span class="field">// kata_kunci</span><h3>Frekuensi Teratas</h3></div>
+        <div class="card-b"><div id="trend-bars" class="chart-holder"></div></div>
+    </div>
+</div>
+
+@code {
+    private string _keyword = "";
+    private List<ForecastPoint> _forecast = new();
+    private List<TrendingTopic> _trending = new();
+    private List<WordFreq> _words = new();
+    private bool _needsDraw;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        var kw = string.IsNullOrWhiteSpace(_keyword) ? null : _keyword.Trim();
+        _forecast = await Analytics.PredictAsync(30, 7, kw);
+        _trending = await Analytics.GetTrendingTopicsAsync(7);
+        _words = await Analytics.GetTopKeywordsAsync(14, 40);
+        _needsDraw = true;
+    }
+
+    private async Task Reload() { await Load(); await Draw(); }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (_needsDraw) { _needsDraw = false; await Draw(); }
+    }
+
+    private async Task Draw()
+    {
+        await JS.InvokeVoidAsync("clTrendChart", "trend-forecast",
+            _forecast.Select(f => new { date = f.Date, value = f.Value, isForecast = f.IsForecast }), new { height = 300 });
+        await JS.InvokeVoidAsync("clWordCloud", "trend-cloud", _words, new { height = 300 });
+        await JS.InvokeVoidAsync("clBars", "trend-bars", _words.Take(12).Select(w => new { w.Word, w.Count }), new { });
+    }
+}

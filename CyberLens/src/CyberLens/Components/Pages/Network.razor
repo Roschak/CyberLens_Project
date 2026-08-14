@@ -1,0 +1,40 @@
+@page "/network"
+@inject AnalyticsService Analytics
+@inject IJSRuntime JS
+
+<PageTitle>Jaringan Entitas — CyberLens</PageTitle>
+
+<PageHeader Title="Jaringan Entitas" Eyebrow="network analysis" />
+
+<div class="card">
+    <div class="card-h">
+        <span class="field">// force_graph</span>
+        <h3>Hubungan Akun, Sumber &amp; Entitas</h3>
+        <div class="spacer" style="flex:1"></div>
+        <span class="mono" style="font-size:11px;color:var(--ink-mute)">seret simpul untuk menata · @_graph?.Nodes.Count entitas · @_graph?.Links.Count relasi</span>
+    </div>
+    <div class="card-b">
+        @if (_graph is null) { <div class="center-load"><div class="spin"></div></div> }
+        <div id="network-graph" class="chart-holder"></div>
+    </div>
+</div>
+
+@code {
+    private NetworkGraph? _graph;
+    private bool _draw;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _graph = await Analytics.GetNetworkGraphAsync();
+        _draw = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (_draw && _graph is not null)
+        {
+            _draw = false;
+            await JS.InvokeVoidAsync("clNetwork", "network-graph", _graph, new { height = 520 });
+        }
+    }
+}

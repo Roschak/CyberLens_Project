@@ -1,0 +1,65 @@
+@page "/geomap"
+@inject AnalyticsService Analytics
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Peta Geospasial — CyberLens</PageTitle>
+
+<PageHeader Title="Peta Geospasial" Eyebrow="geospatial analysis" />
+
+<div class="grid cols-3">
+    <div class="card" style="grid-column:span 2;overflow:hidden">
+        <div class="card-h"><span class="field">// base_map</span><h3>Sebaran Lokasi Sumber Informasi</h3></div>
+        <div class="card-b" style="padding:0;position:relative">
+            @if (_points is null) { <div class="center-load" style="position:absolute;inset:0;z-index:500"><div class="spin"></div></div> }
+            <div id="geo-leaflet" style="width:100%;height:460px"></div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-h"><span class="field">// lokasi_teratas</span><h3>Titik Terpanas</h3></div>
+        <div class="card-b" style="max-height:440px;overflow-y:auto">
+            @if (_points is not null)
+            {
+                @foreach (var p in _points.Take(20))
+                {
+                    <div style="padding:9px 0;border-bottom:1.5px solid var(--line)">
+                        <div class="row" style="justify-content:space-between">
+                            <span style="font-weight:600">@p.Location</span>
+                            <span class="badge @SentBadge(p.AvgSentiment)"><span class="d" style="background:@SentColor(p.AvgSentiment)"></span>@p.Count</span>
+                        </div>
+                        <div class="mono" style="font-size:10.5px;color:var(--ink-mute);margin-top:2px">@p.Lat.ToString("0.00"), @p.Lon.ToString("0.00") · sentimen @p.AvgSentiment.ToString("+0.00;-0.00")</div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<GeoPoint>? _points;
+    private bool _draw;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _points = await Analytics.GetGeoPointsAsync(30);
+        _draw = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (_draw && _points is not null)
+        {
+            _draw = false;
+            await JS.InvokeVoidAsync("clLeafletMap", "geo-leaflet",
+                _points.Select(p => new { p.Lat, p.Lon, p.Location, p.Count, p.AvgSentiment }));
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("clLeafletDispose"); } catch { }
+    }
+
+    private static string SentBadge(double s) => s > 0.15 ? "pos" : s < -0.15 ? "neg" : "neu";
+    private static string SentColor(double s) => s > 0.15 ? "var(--pos)" : s < -0.15 ? "var(--neg)" : "var(--neu)";
+}

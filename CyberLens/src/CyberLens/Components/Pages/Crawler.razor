@@ -1,0 +1,208 @@
+@page "/crawler"
+@using CyberLens.Services.Collection
+@inject CrawlLogService Logs
+@inject CrawlerStatusService Status
+@inject CollectorService Collector
+@inject AppSettingsService Settings
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Crawler Ops — CyberLens</PageTitle>
+
+<PageHeader Title="Crawler Ops" Eyebrow="collection statistics &amp; logs">
+    <AuthorizeView Roles="Analyst,Admin">
+        <button class="btn accent" @onclick="CrawlNow" disabled="@_crawling">
+            @if (_crawling) { <span class="spin" style="width:16px;height:16px;border-width:2px"></span> <text>Menjalankan…</text> }
+            else { <Icon Name="reset" Size="16" /> <text>Crawl sekarang</text> }
+        </button>
+    </AuthorizeView>
+</PageHeader>
+
+<!-- Live status banner -->
+<div class="card pad" style="margin-bottom:18px;border-color:@StateColor">
+    <div class="row" style="gap:14px;flex-wrap:wrap">
+        <div class="row" style="gap:9px">
+            <span style="width:12px;height:12px;border-radius:50%;background:@StateColor;@(Status.IsCollecting ? "animation:pulse 1.2s infinite" : "")"></span>
+            <span class="mono" style="font-weight:700;letter-spacing:0.1em;text-transform:uppercase">CRAWLER: @StateLabel</span>
+        </div>
+        @if (Status.IsCollecting && Status.CurrentConnector is not null)
+        {
+            <span class="tag-chip">▶ @Status.CurrentConnector</span>
+        }
+        <span class="spacer" style="flex:1"></span>
+        <span class="mono" style="font-size:12px;color:var(--ink-mute)">
+            interval @Status.IntervalSeconds d · run terakhir: @(Status.LastRunAt?.ToLocalTime().ToString("HH:mm:ss") ?? "—") (+@Status.LastItemsAdded item)
+            @if (Status.NextRunAt is { } nx) { <text> · berikutnya ~@nx.ToLocalTime().ToString("HH:mm:ss")</text> }
+        </span>
+    </div>
+</div>
+
+<div class="toolbar">
+    <div class="seg-toggle">
+        <button class="@(_days == 1 ? "on" : "")" @onclick="() => SetDays(1)">24 jam</button>
+        <button class="@(_days == 7 ? "on" : "")" @onclick="() => SetDays(7)">7 hari</button>
+        <button class="@(_days == 30 ? "on" : "")" @onclick="() => SetDays(30)">30 hari</button>
+    </div>
+    <select class="inp" style="max-width:230px" @bind="_connector" @bind:after="Reload">
+        <option value="">Semua sumber/connector</option>
+        @foreach (var c in _connectorNames) { <option value="@c">@c</option> }
+    </select>
+    <select class="inp" style="max-width:150px" @bind="_status" @bind:after="Reload">
+        <option value="">Semua status</option>
+        <option value="success">Sukses</option>
+        <option value="failed">Gagal</option>
+    </select>
+    <select class="inp" style="max-width:150px" @bind="_trigger" @bind:after="Reload">
+        <option value="">Semua trigger</option>
+        <option value="Scheduled">Terjadwal</option>
+        <option value="Manual">Manual</option>
+    </select>
+</div>
+
+@if (_stats is not null)
+{
+    <div class="grid cols-4" style="margin-bottom:18px">
+        <StatTile Field="run collection" Value="@_stats.Runs.ToString("N0")" Sub="@($"{_stats.Connectors} connector aktif")" />
+        <StatTile Field="item terkumpul" Value="@_stats.ItemsAdded.ToString("N0")" Sub="@($"dari {_stats.ItemsFound:N0} ditemukan")" />
+        <StatTile Field="success rate" Value="@($"{_stats.SuccessRate:0.#}%")" Sub="@($"{_stats.FailedRuns} run gagal")" Alert="@(_stats.FailedRuns > 0)" />
+        <StatTile Field="durasi rata-rata" Value="@($"{_stats.AvgDurationMs} ms")" Sub="per connector run" />
+    </div>
+}
+
+<div class="grid cols-3" style="margin-bottom:18px">
+    <div class="card" style="grid-column:span 2">
+        <div class="card-h"><span class="field">// item_harian</span><h3>Item Terkumpul per Hari</h3></div>
+        <div class="card-b"><div id="crawl-daily" class="chart-holder"></div></div>
+    </div>
+    <div class="card">
+        <div class="card-h"><span class="field">// outcome</span><h3>Sukses vs Gagal</h3></div>
+        <div class="card-b"><div id="crawl-outcome" class="chart-holder"></div></div>
+    </div>
+</div>
+
+<div class="grid cols-2" style="margin-bottom:18px">
+    <div class="card">
+        <div class="card-h"><span class="field">// per_connector</span><h3>Item per Connector</h3></div>
+        <div class="card-b"><div id="crawl-connector" class="chart-holder"></div></div>
+    </div>
+    <div class="card">
+        <div class="card-h"><span class="field">// lokasi</span><h3>Lokasi Teratas (item terkumpul)</h3></div>
+        <div class="card-b">
+            @if (_locations.Count == 0) { <div class="empty">Belum ada data lokasi pada periode ini.</div> }
+            else { <div id="crawl-loc" class="chart-holder"></div> }
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-h"><span class="field">// activity_log</span><h3>Log Aktivitas Crawler</h3>
+        <div class="spacer" style="flex:1"></div>
+        <span class="mono" style="font-size:11px;color:var(--ink-mute)">@_runs.Count entri</span>
+    </div>
+    <div class="tbl-wrap">
+        <table class="tbl">
+            <thead>
+                <tr><th>Waktu</th><th>Connector</th><th>Jenis</th><th>Trigger</th><th>Ditemukan</th><th>Baru</th><th>Duplikat</th><th>Durasi</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+                @if (_runs.Count == 0)
+                {
+                    <tr><td colspan="9"><div class="empty">Tidak ada log untuk filter ini.</div></td></tr>
+                }
+                @foreach (var r in _runs)
+                {
+                    <tr>
+                        <td class="mono" style="font-size:11px;white-space:nowrap">@r.StartedAt.ToLocalTime().ToString("dd/MM HH:mm:ss")</td>
+                        <td style="font-weight:600">@r.Connector</td>
+                        <td><span class="tag-chip">@r.Kind</span></td>
+                        <td>@r.Trigger</td>
+                        <td class="mono">@r.ItemsFound</td>
+                        <td class="mono" style="color:var(--pos);font-weight:600">@(r.ItemsAdded > 0 ? "+" + r.ItemsAdded : "0")</td>
+                        <td class="mono" style="color:var(--ink-mute)">@r.ItemsDuplicate</td>
+                        <td class="mono">@r.DurationMs ms</td>
+                        <td>
+                            @if (r.Success)
+                            {
+                                <span class="badge pos"><span class="d" style="background:var(--pos)"></span>OK</span>
+                            }
+                            else
+                            {
+                                <span class="badge neg" title="@r.Error"><span class="d" style="background:var(--neg)"></span>GAGAL</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private int _days = 7;
+    private string _connector = "", _status = "", _trigger = "";
+    private CrawlStats? _stats;
+    private List<CrawlRun> _runs = new();
+    private List<CrawlDaily> _daily = new();
+    private List<ConnectorStat> _perConnector = new();
+    private List<CrawlLocation> _locations = new();
+    private List<string> _connectorNames = new();
+    private bool _crawling;
+    private bool _needsDraw;
+
+    private DateTime Since => DateTime.UtcNow.AddDays(-_days);
+    private string StateLabel => Status.State switch { "running" => "BERJALAN", "idle" => "SIAGA", _ => "NONAKTIF" };
+    private string StateColor => Status.State switch { "running" => "var(--pos)", "idle" => "var(--amber)", _ => "var(--red)" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        Status.Changed += OnStatus;
+        _connectorNames = await Logs.GetConnectorNamesAsync();
+        await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _stats = await Logs.GetStatsAsync(Since);
+        _runs = await Logs.GetRunsAsync(Since, _connector, _status, _trigger, 200);
+        _daily = await Logs.GetDailyAddedAsync(_days < 1 ? 1 : _days);
+        _perConnector = await Logs.GetPerConnectorAsync(Since);
+        _locations = await Logs.GetTopLocationsAsync(Since);
+        _needsDraw = true;
+        StateHasChanged();
+    }
+
+    private async Task SetDays(int d) { _days = d; await Reload(); }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (_needsDraw) { _needsDraw = false; await Draw(); }
+    }
+
+    private async Task Draw()
+    {
+        await JS.InvokeVoidAsync("clTrendChart", "crawl-daily",
+            _daily.Select(d => new { date = d.Date, value = d.Added }), new { height = 240 });
+        await JS.InvokeVoidAsync("clDonut", "crawl-outcome",
+            new[]
+            {
+                new { label = "Sukses", count = (_stats?.Runs ?? 0) - (_stats?.FailedRuns ?? 0) },
+                new { label = "Gagal", count = _stats?.FailedRuns ?? 0 }
+            }, new { height = 220 });
+        await JS.InvokeVoidAsync("clBars", "crawl-connector",
+            _perConnector.Take(10).Select(c => new { label = c.Connector, value = c.Added }), new { labelW = 170 });
+        if (_locations.Count > 0)
+            await JS.InvokeVoidAsync("clBars", "crawl-loc",
+                _locations.Select(l => new { label = l.Location, value = l.Count }), new { labelW = 120 });
+    }
+
+    private async Task CrawlNow()
+    {
+        _crawling = true; StateHasChanged();
+        try { await Collector.RunOnceAsync(Settings.Current, "Manual"); await Reload(); }
+        finally { _crawling = false; StateHasChanged(); }
+    }
+
+    private async void OnStatus() => await InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Status.Changed -= OnStatus;
+}

@@ -1,0 +1,276 @@
+@page "/chat"
+@inject ChatService ChatSvc
+@inject StorageService Storage
+@inject MarkdownService Md
+@inject AiKernelFactory Kernel
+@inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthState
+@using System.Security.Claims
+
+<PageTitle>Bang Kevin — CyberLens</PageTitle>
+
+<PageHeader Title="Bang Kevin" Eyebrow="AI intelligence assistant">
+    <span class="tag-chip">model: @Kernel.ActiveModel</span>
+    <button class="btn accent sm" @onclick="NewSession"><Icon Name="plus" Size="15" /> Sesi baru</button>
+</PageHeader>
+
+<div class="chat-shell">
+    <div class="card chat-sessions">
+        <div class="card-h"><span class="field">// sessions</span></div>
+        <div class="chat-sess-list">
+            @foreach (var s in _sessions)
+            {
+                <div class="chat-sess @(s.Id == _activeId ? "on" : "")" @onclick="() => SelectSession(s.Id)">
+                    <Icon Name="chat" Size="15" />
+                    <span class="t">@s.Title</span>
+                    <span class="x" @onclick:stopPropagation @onclick="() => DeleteSession(s.Id)"><Icon Name="trash" Size="14" /></span>
+                </div>
+            }
+            @if (_sessions.Count == 0) { <div class="empty" style="padding:20px">Belum ada sesi.</div> }
+        </div>
+    </div>
+
+    <div class="card chat-main">
+        <div class="card-h">
+            <span class="field">// thread</span>
+            <h3>@(_sessions.FirstOrDefault(s => s.Id == _activeId)?.Title ?? "Bang Kevin")</h3>
+            <div class="spacer" style="flex:1"></div>
+            @if (_activeId is not null)
+            {
+                <button class="btn sm ghost" @onclick="ResetSession" title="Reset sesi"><Icon Name="reset" Size="15" /> Reset</button>
+            }
+        </div>
+
+        <div class="chat-thread" @ref="_threadRef">
+            @if (_activeId is null)
+            {
+                <div style="margin:auto;max-width:640px;text-align:center">
+                    <div style="font-size:40px;margin-bottom:10px">👋</div>
+                    <div class="empty" style="padding:0 0 18px">
+                        Halo! Saya <b>Bang Kevin</b>, asisten intelijen CyberLens.<br />
+                        Coba salah satu contoh di bawah, atau ketik pertanyaan Anda sendiri.
+                    </div>
+                    <div class="mono" style="font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:10px">// contoh prompt</div>
+                    <div class="wrap" style="justify-content:center">
+                        @foreach (var ex in Examples)
+                        {
+                            <button class="btn sm ghost" style="text-align:left" @onclick="() => UseExample(ex)">@ex</button>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                @foreach (var m in _messages)
+                {
+                    <div class="bubble @(m.Role == ChatRole.User ? "user" : "bot")">
+                        <div class="who">@(m.Role == ChatRole.User ? "Anda" : "Bang Kevin")</div>
+                        @if (m.Role == ChatRole.Assistant)
+                        {
+                            <div class="md">@Md.ToHtml(m.Content)</div>
+                        }
+                        else
+                        {
+                            <div style="white-space:pre-wrap">@m.Content</div>
+                            @if (m.Attachments.Any())
+                            {
+                                <div class="attach-row" style="margin-top:8px">
+                                    @foreach (var a in m.Attachments)
+                                    {
+                                        @if (a.IsImage)
+                                        {
+                                            <img src="@a.Url" style="max-width:180px;border:2px solid rgba(0,0,0,0.3);border-radius:3px" />
+                                        }
+                                        else
+                                        {
+                                            <span class="attach-chip"><Icon Name="paperclip" Size="12" /> @a.FileName</span>
+                                        }
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+                @if (_thinking)
+                {
+                    <div class="bubble bot">
+                        <div class="who">Bang Kevin</div>
+                        <div class="typing"><span></span><span></span><span></span></div>
+                    </div>
+                }
+            }
+        </div>
+
+        @if (_activeId is not null)
+        {
+            <div class="chat-input">
+                @if (_messages.Count == 0 && !_thinking)
+                {
+                    <div class="wrap" style="margin-bottom:10px">
+                        @foreach (var ex in Examples.Take(4))
+                        {
+                            <button class="tag-chip" style="cursor:pointer;border:none" @onclick="() => UseExample(ex)">💡 @ex</button>
+                        }
+                    </div>
+                }
+                @if (_pending.Count > 0)
+                {
+                    <div class="attach-row">
+                        @foreach (var a in _pending)
+                        {
+                            <span class="attach-chip">
+                                @(a.IsImage ? "🖼" : "📄") @a.FileName
+                                <span style="cursor:pointer" @onclick="() => _pending.Remove(a)">✕</span>
+                            </span>
+                        }
+                    </div>
+                }
+                <div class="row" style="align-items:flex-end;gap:10px">
+                    <label class="icon-btn" title="Lampirkan gambar/dokumen" style="flex:none">
+                        <Icon Name="paperclip" Size="18" />
+                        <InputFile OnChange="OnFiles" multiple style="display:none" accept="image/*,.pdf,.txt,.csv,.md,.docx,.json" />
+                    </label>
+                    <textarea class="inp" rows="2" placeholder="Tanya Bang Kevin… (mis. 'ringkas tren ransomware minggu ini')"
+                              @bind="_input" @bind:event="oninput" @onkeydown="OnKey" disabled="@_thinking"></textarea>
+                    <button class="btn accent" style="flex:none" @onclick="Send" disabled="@(_thinking || (string.IsNullOrWhiteSpace(_input) && _pending.Count == 0))">
+                        <Icon Name="send" Size="17" />
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<ChatSession> _sessions = new();
+    private List<ChatMessage> _messages = new();
+    private int? _activeId;
+    private string _input = "";
+    private bool _thinking;
+    private int _userId = 1;
+    private readonly List<ChatService.PendingAttachment> _pending = new();
+    private ElementReference _threadRef;
+
+    private static readonly string[] Examples =
+    {
+        "Ringkas situasi intelijen 7 hari terakhir",
+        "Bagaimana sebaran sentimen minggu ini?",
+        "Topik apa yang sedang naik daun?",
+        "Cari post tentang ransomware dan sebutkan sumbernya",
+        "Prediksi volume post 7 hari ke depan untuk kata kunci pemilu",
+        "Entitas apa yang paling banyak disebut di jaringan?",
+        "Apa saja alert kritis terbaru?",
+        "Cari berita terbaru soal keamanan siber di internet",
+    };
+
+    private async Task UseExample(string text)
+    {
+        _input = text;
+        if (_activeId is null)
+        {
+            var s = await ChatSvc.CreateSessionAsync(_userId);
+            _sessions.Insert(0, s);
+            _activeId = s.Id;
+            _messages = new();
+        }
+        await Send();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        if (int.TryParse(auth.User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id)) _userId = id;
+        _sessions = await ChatSvc.GetSessionsAsync(_userId);
+        if (_sessions.Count > 0) await SelectSession(_sessions[0].Id);
+    }
+
+    private async Task NewSession()
+    {
+        var s = await ChatSvc.CreateSessionAsync(_userId);
+        _sessions.Insert(0, s);
+        await SelectSession(s.Id);
+    }
+
+    private async Task SelectSession(int id)
+    {
+        _activeId = id;
+        _messages = await ChatSvc.GetMessagesAsync(id);
+        _pending.Clear();
+        StateHasChanged();
+        await ScrollDown();
+    }
+
+    private async Task DeleteSession(int id)
+    {
+        await ChatSvc.DeleteSessionAsync(id);
+        _sessions.RemoveAll(s => s.Id == id);
+        if (_activeId == id) { _activeId = null; _messages.Clear(); }
+        StateHasChanged();
+    }
+
+    private async Task ResetSession()
+    {
+        if (_activeId is null) return;
+        await ChatSvc.ResetSessionAsync(_activeId.Value);
+        _messages.Clear();
+        var s = _sessions.FirstOrDefault(x => x.Id == _activeId);
+        if (s is not null) s.Title = "Percakapan baru";
+        StateHasChanged();
+    }
+
+    private async Task OnFiles(InputFileChangeEventArgs e)
+    {
+        foreach (var file in e.GetMultipleFiles(6))
+        {
+            try
+            {
+                using var stream = file.OpenReadStream(15 * 1024 * 1024);
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                ms.Position = 0;
+                var (url, _) = await Storage.SaveUploadAsync(file.Name, ms);
+                var isImage = file.ContentType.StartsWith("image/");
+                _pending.Add(new ChatService.PendingAttachment(file.Name, url, file.ContentType, isImage, file.Size));
+            }
+            catch { /* skip oversize/failed files */ }
+        }
+        StateHasChanged();
+    }
+
+    private async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey) { await Send(); }
+    }
+
+    private async Task Send()
+    {
+        if (_activeId is null || _thinking) return;
+        var text = _input.Trim();
+        if (string.IsNullOrEmpty(text) && _pending.Count == 0) return;
+        var attachments = _pending.ToList();
+
+        // optimistic user bubble
+        _messages.Add(new ChatMessage
+        {
+            Role = ChatRole.User, Content = text,
+            Attachments = attachments.Select(a => new ChatAttachment { FileName = a.FileName, Url = a.Url, IsImage = a.IsImage }).ToList()
+        });
+        _input = ""; _pending.Clear(); _thinking = true;
+        StateHasChanged();
+        await ScrollDown();
+
+        var reply = await ChatSvc.SendAsync(_activeId.Value, text, attachments);
+        _thinking = false;
+        _messages.Add(reply);
+        // refresh session title
+        _sessions = await ChatSvc.GetSessionsAsync(_userId);
+        StateHasChanged();
+        await ScrollDown();
+    }
+
+    private async Task ScrollDown()
+    {
+        await Task.Delay(50);
+        await JS.InvokeVoidAsync("cyberlens.scrollToBottom", _threadRef);
+    }
+}

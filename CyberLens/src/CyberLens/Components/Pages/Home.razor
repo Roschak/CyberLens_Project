@@ -1,0 +1,117 @@
+@page "/"
+@inject AnalyticsService Analytics
+@inject IJSRuntime JS
+@implements IDisposable
+@inject NotificationBus Bus
+
+<PageTitle>Dashboard — CyberLens</PageTitle>
+
+<PageHeader Title="Dashboard" Eyebrow="situational overview">
+    <span class="badge pos"><span class="d" style="background:var(--pos)"></span>SISTEM AKTIF</span>
+</PageHeader>
+
+@if (_stats is null)
+{
+    <div class="center-load"><div class="spin"></div></div>
+}
+else
+{
+    <div class="grid cols-4" style="margin-bottom:18px">
+        <StatTile Field="post / 24 jam" Value="@_stats.PostsToday.ToString("N0")" Sub="@($"{_stats.Posts7d:N0} dalam 7 hari")" />
+        <StatTile Field="sumber aktif" Value="@_stats.ActiveSources.ToString()" Sub="@($"{_stats.TotalPosts:N0} total post")" />
+        <StatTile Field="alert belum dibaca" Value="@_stats.UnreadAlerts.ToString()" Sub="@($"{_stats.ActiveKeywords} kata kunci dipantau")" Alert="true" />
+        <StatTile Field="sentimen 7 hari" Value="@_stats.AvgSentiment7d.ToString("+0.00;-0.00;0.00")" Sub="@($"kategori teratas: {_stats.TopCategory7d}")" />
+    </div>
+
+    <div class="grid cols-3" style="margin-bottom:18px">
+        <div class="card" style="grid-column:span 2">
+            <div class="card-h"><span class="field">// volume_harian</span><h3>Volume Post per Kategori (30 hari)</h3></div>
+            <div class="card-b"><div id="dash-series" class="chart-holder"></div></div>
+        </div>
+        <div class="card">
+            <div class="card-h"><span class="field">// sentimen</span><h3>Sebaran Sentimen</h3></div>
+            <div class="card-b"><div id="dash-donut" class="chart-holder"></div></div>
+        </div>
+    </div>
+
+    <div class="grid cols-3">
+        <div class="card">
+            <div class="card-h"><span class="field">// naik_daun</span><h3>Topik Trending</h3></div>
+            <div class="card-b">
+                @if (_trending.Count == 0) { <div class="empty">Menghitung tren…</div> }
+                else
+                {
+                    @foreach (var t in _trending.Take(7))
+                    {
+                        <div class="row" style="justify-content:space-between;padding:7px 0;border-bottom:1.5px solid var(--line)">
+                            <span class="tag-chip">@t.Topic</span>
+                            <span class="mono" style="font-size:12px;font-weight:600;color:@(t.GrowthPct >= 0 ? "var(--pos)" : "var(--neg)")">@t.GrowthPct.ToString("+0;-0")% · @t.Recent</span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-h"><span class="field">// kategori</span><h3>Distribusi Kategori</h3></div>
+            <div class="card-b"><div id="dash-cats" class="chart-holder"></div></div>
+        </div>
+        <div class="card">
+            <div class="card-h"><span class="field">// word_cloud</span><h3>Kata Kunci Populer</h3></div>
+            <div class="card-b"><div id="dash-cloud" class="chart-holder"></div></div>
+        </div>
+    </div>
+}
+
+@code {
+    private DashboardStats? _stats;
+    private List<SeriesDto> _series = new();
+    private List<SentimentSlice> _sentiment = new();
+    private List<CategorySlice> _categories = new();
+    private List<WordFreq> _words = new();
+    private List<TrendingTopic> _trending = new();
+    private bool _rendered;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _stats = await Analytics.GetDashboardStatsAsync();
+        _series = await Analytics.GetCategorySeriesAsync(30, 5);
+        _sentiment = await Analytics.GetSentimentBreakdownAsync(7);
+        _categories = await Analytics.GetCategoryBreakdownAsync(30);
+        _words = await Analytics.GetTopKeywordsAsync(7, 40);
+        _trending = await Analytics.GetTrendingTopicsAsync(7);
+        Bus.PostCollected += OnPost;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (_stats is not null && !_rendered)
+        {
+            _rendered = true;
+            await DrawCharts();
+        }
+    }
+
+    private async Task DrawCharts()
+    {
+        await JS.InvokeVoidAsync("clSeriesChart", "dash-series", _series, new { height = 260 });
+        await JS.InvokeVoidAsync("clDonut", "dash-donut", _sentiment, new { height = 240, sentiment = true });
+        await JS.InvokeVoidAsync("clBars", "dash-cats", _categories.Select(c => new { c.Name, c.Count, c.Color }), new { });
+        await JS.InvokeVoidAsync("clWordCloud", "dash-cloud", _words, new { height = 230 });
+    }
+
+    private int _newCount;
+    private async void OnPost(Post p)
+    {
+        _newCount++;
+        if (_newCount % 5 == 0)
+        {
+            await InvokeAsync(async () =>
+            {
+                _stats = await Analytics.GetDashboardStatsAsync();
+                StateHasChanged();
+            });
+        }
+    }
+
+    public void Dispose() => Bus.PostCollected -= OnPost;
+}

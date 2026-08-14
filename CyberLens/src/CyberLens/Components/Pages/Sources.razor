@@ -1,0 +1,114 @@
+@page "/sources"
+@inject IDbContextFactory<CyberLensDbContext> DbFactory
+@inject CyberLens.Services.Collection.CollectorService Collector
+@inject AppSettingsService Settings
+
+<PageTitle>Sumber — CyberLens</PageTitle>
+
+<PageHeader Title="Sumber Data" Eyebrow="collection sources">
+    <AuthorizeView Roles="Analyst,Admin">
+        <button class="btn accent" @onclick="CrawlNow" disabled="@_crawling">
+            @if (_crawling) { <span class="spin" style="width:16px;height:16px;border-width:2px"></span> <text>Mengumpulkan…</text> }
+            else { <Icon Name="reset" Size="16" /> <text>Crawl sekarang</text> }
+        </button>
+    </AuthorizeView>
+</PageHeader>
+
+@if (_crawlMsg is not null)
+{
+    <div class="card pad" style="margin-bottom:18px;box-shadow:var(--shadow-sm);border-color:var(--pos)">
+        <span class="mono" style="font-size:12px;color:var(--pos);font-weight:600"><Icon Name="check" Size="14" /> @_crawlMsg</span>
+    </div>
+}
+
+@if (_loading) { <div class="center-load"><div class="spin"></div></div> }
+else
+{
+    <div class="grid cols-4" style="margin-bottom:18px">
+        @foreach (var g in _byKind)
+        {
+            <div class="card stat">
+                <div class="accentbar"></div>
+                <div class="field">@KindLabel(g.Kind)</div>
+                <div class="num">@g.Count</div>
+                <div class="sub">@g.Posts.ToString("N0") post</div>
+            </div>
+        }
+    </div>
+
+    <div class="card">
+        <div class="tbl-wrap">
+            <table class="tbl">
+                <thead>
+                    <tr><th>Sumber</th><th>Jenis</th><th>Negara</th><th>Trust</th><th>Post</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in _sources)
+                    {
+                        <tr>
+                            <td style="font-weight:600">@s.Name<div class="mono" style="font-size:10.5px;color:var(--ink-mute)">@s.Url</div></td>
+                            <td><span class="tag-chip">@KindLabel(s.Kind)</span></td>
+                            <td>@s.Country</td>
+                            <td>
+                                <div class="row" style="gap:8px">
+                                    <div class="progress-track" style="width:70px"><div class="progress-fill" style="width:@((s.TrustScore*100).ToString("0"))%;background:@TrustColor(s.TrustScore)"></div></div>
+                                    <span class="mono" style="font-size:11px">@s.TrustScore.ToString("0.00")</span>
+                                </div>
+                            </td>
+                            <td class="mono">@(_counts.GetValueOrDefault(s.Id))</td>
+                            <td>@(s.IsActive ? "AKTIF" : "NONAKTIF")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Source> _sources = new();
+    private Dictionary<int, int> _counts = new();
+    private List<(SourceKind Kind, int Count, int Posts)> _byKind = new();
+    private bool _loading = true;
+    private bool _crawling;
+    private string? _crawlMsg;
+
+    private async Task CrawlNow()
+    {
+        _crawling = true; _crawlMsg = null; StateHasChanged();
+        try
+        {
+            var added = await Collector.RunOnceAsync(Settings.Current, "Manual");
+            _crawlMsg = added > 0
+                ? $"Pengumpulan selesai — {added} item baru masuk (RSS langsung + stream)."
+                : "Pengumpulan selesai — tidak ada item baru (kemungkinan sudah ada / feed tidak terjangkau).";
+            await Load();
+        }
+        catch (Exception ex) { _crawlMsg = $"Gagal mengumpulkan: {ex.Message}"; }
+        finally { _crawling = false; StateHasChanged(); }
+    }
+
+    private async Task Load()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        _sources = await db.Sources.OrderByDescending(s => s.TrustScore).ToListAsync();
+        _counts = await db.Posts.GroupBy(p => p.SourceId).Select(g => new { g.Key, C = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.C);
+        _byKind = _sources.GroupBy(s => s.Kind)
+            .Select(g => (g.Key, g.Count(), g.Sum(s => _counts.GetValueOrDefault(s.Id))))
+            .OrderByDescending(x => x.Item3).ToList();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+        _loading = false;
+    }
+
+    private static string KindLabel(SourceKind k) => k switch
+    {
+        SourceKind.News => "Berita", SourceKind.SocialMedia => "Media Sosial", SourceKind.Blog => "Blog",
+        SourceKind.Forum => "Forum", SourceKind.Official => "Resmi", SourceKind.DarkWeb => "Dark Web", _ => k.ToString()
+    };
+    private static string TrustColor(double t) => t >= 0.7 ? "var(--pos)" : t >= 0.4 ? "var(--amber)" : "var(--red)";
+}

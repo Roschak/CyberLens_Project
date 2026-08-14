@@ -1,0 +1,94 @@
+@page "/reports"
+@inject IDbContextFactory<CyberLensDbContext> DbFactory
+@inject ReportService ReportSvc
+@inject AuthService Auth
+
+<PageTitle>Laporan — CyberLens</PageTitle>
+
+<PageHeader Title="Laporan" Eyebrow="automated reporting &amp; export" />
+
+<div class="card pad" style="margin-bottom:18px">
+    <div class="mono" style="font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:12px">// buat laporan baru</div>
+    <div class="row wrap" style="align-items:flex-end">
+        <div style="min-width:170px">
+            <label class="fld">Periode</label>
+            <select class="inp" @bind="_kind">
+                <option value="Daily">Harian (1 hari)</option>
+                <option value="Weekly">Mingguan (7 hari)</option>
+                <option value="Monthly">Bulanan (30 hari)</option>
+            </select>
+        </div>
+        <div style="min-width:150px">
+            <label class="fld">Format</label>
+            <select class="inp" @bind="_format">
+                <option value="Pdf">PDF</option>
+                <option value="Excel">Excel</option>
+            </select>
+        </div>
+        <button class="btn accent" @onclick="Generate" disabled="@_busy">
+            @if (_busy) { <span class="spin" style="width:16px;height:16px;border-width:2px"></span> <text>Membuat…</text> }
+            else { <Icon Name="report" Size="16" /> <text>Buat laporan</text> }
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-h"><span class="field">// arsip</span><h3>Laporan Tersimpan</h3></div>
+    <div class="tbl-wrap">
+        <table class="tbl">
+            <thead><tr><th>Judul</th><th>Jenis</th><th>Format</th><th>Periode</th><th>Dibuat</th><th></th></tr></thead>
+            <tbody>
+                @if (_reports.Count == 0)
+                {
+                    <tr><td colspan="6"><div class="empty">Belum ada laporan. Buat laporan pertama di atas.</div></td></tr>
+                }
+                @foreach (var r in _reports)
+                {
+                    <tr>
+                        <td style="font-weight:600">@r.Title</td>
+                        <td><span class="tag-chip">@r.Kind</span></td>
+                        <td>@r.Format</td>
+                        <td class="mono" style="font-size:11px">@r.PeriodStart.ToString("dd/MM") – @r.PeriodEnd.ToString("dd/MM")</td>
+                        <td class="mono" style="font-size:11px">@r.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                        <td><a class="btn sm accent" href="/files/@r.StoragePath" target="_blank"><Icon Name="download" Size="14" /> Unduh</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private List<ReportRecord> _reports = new();
+    private string _kind = "Weekly";
+    private string _format = "Pdf";
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        _reports = await db.Reports.OrderByDescending(r => r.CreatedAt).Take(50).ToListAsync();
+    }
+
+    private async Task Generate()
+    {
+        _busy = true; StateHasChanged();
+        try
+        {
+            var kind = Enum.Parse<ReportKind>(_kind);
+            var format = Enum.Parse<ReportFormat>(_format);
+            var end = DateTime.UtcNow;
+            var start = kind switch
+            {
+                ReportKind.Weekly => end.AddDays(-7),
+                ReportKind.Monthly => end.AddMonths(-1),
+                _ => end.AddDays(-1)
+            };
+            await ReportSvc.GenerateAsync(kind, format, start, end, Auth.CurrentUserId, Auth.CurrentUsername);
+            await Load();
+        }
+        finally { _busy = false; StateHasChanged(); }
+    }
+}

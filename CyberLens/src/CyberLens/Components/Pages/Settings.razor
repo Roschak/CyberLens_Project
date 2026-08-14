@@ -1,0 +1,227 @@
+@page "/settings"
+@attribute [Authorize(Roles = "Admin")]
+@inject AppSettingsService Config
+@inject AuditService Audit
+@inject AuthService Auth
+@using System.Text.Json
+
+<PageTitle>Pengaturan — CyberLens</PageTitle>
+
+<PageHeader Title="Pengaturan" Eyebrow="editable configuration">
+    <button class="btn accent" @onclick="Save">
+        @if (_saved) { <Icon Name="check" Size="16" /> <text>Tersimpan</text> } else { <text>Simpan konfigurasi</text> }
+    </button>
+</PageHeader>
+
+<div class="card pad" style="margin-bottom:18px;box-shadow:var(--shadow-sm)">
+    <span class="mono" style="font-size:12px;color:var(--ink-mute)">Semua konfigurasi disimpan di <b>config/cyberlens.settings.json</b>. Perubahan database & storage berlaku setelah aplikasi di-restart; perubahan AI, kata kunci, dan lainnya berlaku langsung.</span>
+</div>
+
+<div class="grid cols-2">
+    <div class="card">
+        <div class="card-h"><span class="field">// ai_assistant</span><h3>Bang Kevin (AI)</h3></div>
+        <div class="card-b">
+            <div class="field-row">
+                <label class="fld">Provider model</label>
+                <select class="inp" @bind="_c.Ai.Provider">
+                    <option value="OpenAI">OpenAI</option>
+                    <option value="Anthropic">Anthropic (Claude)</option>
+                    <option value="Gemini">Google Gemini</option>
+                    <option value="Ollama">Ollama (lokal)</option>
+                </select>
+            </div>
+            @if (_c.Ai.Provider == "OpenAI")
+            {
+                <div class="field-row"><label class="fld">OpenAI API Key</label><input class="inp" type="password" @bind="_c.Ai.OpenAIApiKey" /></div>
+                <div class="field-row"><label class="fld">Model</label><input class="inp" @bind="_c.Ai.OpenAIModel" /></div>
+            }
+            else if (_c.Ai.Provider == "Anthropic")
+            {
+                <div class="field-row"><label class="fld">Anthropic API Key</label><input class="inp" type="password" @bind="_c.Ai.AnthropicApiKey" /></div>
+                <div class="field-row"><label class="fld">Model</label><input class="inp" @bind="_c.Ai.AnthropicModel" /></div>
+            }
+            else if (_c.Ai.Provider == "Gemini")
+            {
+                <div class="field-row"><label class="fld">Gemini API Key</label><input class="inp" type="password" @bind="_c.Ai.GeminiApiKey" /></div>
+                <div class="field-row"><label class="fld">Model</label><input class="inp" @bind="_c.Ai.GeminiModel" /></div>
+            }
+            else
+            {
+                <div class="field-row"><label class="fld">Ollama Endpoint</label><input class="inp" @bind="_c.Ai.OllamaEndpoint" /></div>
+                <div class="field-row"><label class="fld">Model</label><input class="inp" @bind="_c.Ai.OllamaModel" /></div>
+            }
+            <div class="field-row"><label class="fld">Temperature (@_c.Ai.Temperature.ToString("0.0"))</label><input class="inp" type="range" min="0" max="1" step="0.1" @bind="_c.Ai.Temperature" /></div>
+            <div class="field-row"><label class="fld">System Prompt (persona)</label><textarea class="inp" rows="5" @bind="_c.Ai.SystemPrompt"></textarea></div>
+            <div class="field-row"><label class="fld">Tavily API Key (pencarian internet)</label><input class="inp" type="password" @bind="_c.Tavily.ApiKey" /></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-h"><span class="field">// database</span><h3>Basis Data</h3></div>
+        <div class="card-b">
+            <div class="field-row">
+                <label class="fld">Provider</label>
+                <select class="inp" @bind="_c.Database.Provider">
+                    <option value="SQLite">SQLite</option>
+                    <option value="SqlServer">SQL Server</option>
+                    <option value="MySql">MySQL</option>
+                    <option value="PostgreSql">PostgreSQL</option>
+                </select>
+            </div>
+            <div class="field-row"><label class="fld">SQLite</label><input class="inp" @bind="_c.Database.SQLite" /></div>
+            <div class="field-row"><label class="fld">SQL Server</label><input class="inp" @bind="_c.Database.SqlServer" /></div>
+            <div class="field-row"><label class="fld">MySQL</label><input class="inp" @bind="_c.Database.MySql" /></div>
+            <div class="field-row"><label class="fld">PostgreSQL</label><input class="inp" @bind="_c.Database.PostgreSql" /></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-h"><span class="field">// storage</span><h3>Penyimpanan File</h3></div>
+        <div class="card-b">
+            <div class="field-row">
+                <label class="fld">Provider</label>
+                <select class="inp" @bind="_c.Storage.Provider">
+                    <option value="FileSystem">FileSystem</option>
+                    <option value="AzureBlob">Azure Blob</option>
+                    <option value="S3">Amazon S3</option>
+                    <option value="MinIO">MinIO</option>
+                </select>
+            </div>
+            @if (_c.Storage.Provider == "FileSystem")
+            {
+                <div class="field-row"><label class="fld">Root folder</label><input class="inp" @bind="_c.Storage.FileSystemRoot" /></div>
+            }
+            else if (_c.Storage.Provider == "AzureBlob")
+            {
+                <div class="field-row"><label class="fld">Connection String</label><input class="inp" type="password" @bind="_c.Storage.AzureBlobConnectionString" /></div>
+                <div class="field-row"><label class="fld">Container</label><input class="inp" @bind="_c.Storage.AzureBlobContainer" /></div>
+            }
+            else if (_c.Storage.Provider == "S3")
+            {
+                <div class="field-row"><label class="fld">Access Key</label><input class="inp" @bind="_c.Storage.S3AccessKey" /></div>
+                <div class="field-row"><label class="fld">Secret Key</label><input class="inp" type="password" @bind="_c.Storage.S3SecretKey" /></div>
+                <div class="field-row"><label class="fld">Region</label><input class="inp" @bind="_c.Storage.S3Region" /></div>
+                <div class="field-row"><label class="fld">Bucket</label><input class="inp" @bind="_c.Storage.S3Bucket" /></div>
+            }
+            else
+            {
+                <div class="field-row"><label class="fld">Endpoint</label><input class="inp" @bind="_c.Storage.MinioEndpoint" /></div>
+                <div class="field-row"><label class="fld">Access Key</label><input class="inp" @bind="_c.Storage.MinioAccessKey" /></div>
+                <div class="field-row"><label class="fld">Secret Key</label><input class="inp" type="password" @bind="_c.Storage.MinioSecretKey" /></div>
+                <div class="field-row"><label class="fld">Bucket</label><input class="inp" @bind="_c.Storage.MinioBucket" /></div>
+            }
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-h"><span class="field">// collection</span><h3>Crawler &amp; Alert</h3></div>
+        <div class="card-b">
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Crawler.Enabled" /> &nbsp;Aktifkan crawler</label></div>
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Crawler.SimulateSocialStreams" /> &nbsp;Simulasikan stream media sosial (demo)</label></div>
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Crawler.DarkWebMonitoring" /> &nbsp;Pemantauan dark web</label></div>
+            <div class="field-row"><label class="fld">Interval crawler (detik)</label><input class="inp" type="number" @bind="_c.Crawler.IntervalSeconds" /></div>
+            <div class="field-row"><label class="fld">RSS feeds (satu per baris)</label><textarea class="inp" rows="3" @bind="_rssText"></textarea></div>
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Alerting.Enabled" /> &nbsp;Aktifkan pemantauan alert real-time</label></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-h"><span class="field">// social_public</span><h3>Media Sosial — Publik (tanpa key)</h3></div>
+        <div class="card-b">
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Social.Reddit.Enabled" /> &nbsp;Reddit (JSON publik)</label></div>
+            <div class="field-row"><label class="fld">Subreddit (satu per baris)</label><textarea class="inp" rows="2" @bind="_redditSubs"></textarea></div>
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Social.Mastodon.Enabled" /> &nbsp;Mastodon (timeline tag publik)</label></div>
+            <div class="field-row"><label class="fld">Instance</label><input class="inp" @bind="_c.Social.Mastodon.Instance" /></div>
+            <div class="field-row"><label class="fld">Hashtag (satu per baris)</label><textarea class="inp" rows="2" @bind="_mastoTags"></textarea></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-h"><span class="field">// social_api</span><h3>Media Sosial — API (butuh kredensial)</h3></div>
+        <div class="card-b">
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Social.YouTube.Enabled" /> &nbsp;YouTube (Data API v3)</label></div>
+            <div class="field-row"><label class="fld">YouTube API Key</label><input class="inp" type="password" @bind="_c.Social.YouTube.ApiKey" /></div>
+            <div class="field-row"><label class="fld">YouTube — kata kunci (satu per baris)</label><textarea class="inp" rows="2" @bind="_ytTerms"></textarea></div>
+
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Social.Twitter.Enabled" /> &nbsp;Twitter / X (API v2)</label></div>
+            <div class="field-row"><label class="fld">X Bearer Token</label><input class="inp" type="password" @bind="_c.Social.Twitter.BearerToken" /></div>
+            <div class="field-row"><label class="fld">X — kata kunci (satu per baris)</label><textarea class="inp" rows="2" @bind="_twTerms"></textarea></div>
+
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Social.Facebook.Enabled" /> &nbsp;Facebook (Graph API)</label></div>
+            <div class="field-row"><label class="fld">FB Access Token</label><input class="inp" type="password" @bind="_c.Social.Facebook.AccessToken" /></div>
+            <div class="field-row"><label class="fld">FB Page IDs (satu per baris)</label><textarea class="inp" rows="2" @bind="_fbPages"></textarea></div>
+
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Social.Threads.Enabled" /> &nbsp;Threads (Graph API)</label></div>
+            <div class="field-row"><label class="fld">Threads Access Token</label><input class="inp" type="password" @bind="_c.Social.Threads.AccessToken" /></div>
+            <div class="field-row"><label class="fld">Threads User ID</label><input class="inp" @bind="_c.Social.Threads.UserId" /></div>
+
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Social.TikTok.Enabled" /> &nbsp;TikTok (API resmi)</label></div>
+            <div class="field-row"><label class="fld">TikTok Client Key</label><input class="inp" type="password" @bind="_c.Social.TikTok.ClientKey" /></div>
+            <div class="field-row"><label class="fld">TikTok Client Secret</label><input class="inp" type="password" @bind="_c.Social.TikTok.ClientSecret" /></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-h"><span class="field">// dark_web</span><h3>Dark Web (Tor / Threat Intel)</h3></div>
+        <div class="card-b">
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.DarkWeb.Enabled" /> &nbsp;Aktifkan pemantauan dark web (nyata)</label></div>
+            <div class="field-row"><label class="fld">Tor SOCKS5 Proxy</label><input class="inp" @bind="_c.DarkWeb.TorProxy" placeholder="socks5://127.0.0.1:9050" /></div>
+            <div class="field-row"><label class="fld">URL .onion (satu per baris)</label><textarea class="inp" rows="2" @bind="_onionUrls" placeholder="http://contoh.onion/feed"></textarea></div>
+            <div class="field-row"><label class="fld">Threat Intel API URL</label><input class="inp" @bind="_c.DarkWeb.ThreatIntelApiUrl" placeholder="https://api.threatfeed.example/leaks" /></div>
+            <div class="field-row"><label class="fld">Threat Intel API Key</label><input class="inp" type="password" @bind="_c.DarkWeb.ThreatIntelApiKey" /></div>
+            <div class="mono" style="font-size:11px;color:var(--ink-mute)">Butuh Tor client aktif (mis. daemon <b>tor</b> di port 9050) untuk .onion, dan/atau langganan feed threat-intel.</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-h"><span class="field">// rest_api</span><h3>REST API &amp; Laporan</h3></div>
+        <div class="card-b">
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Api.Enabled" /> &nbsp;Aktifkan REST API</label></div>
+            <div class="field-row"><label class="fld">API Key (header X-Api-Key)</label><input class="inp" @bind="_c.Api.ApiKey" /></div>
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Reporting.AutoDaily" /> &nbsp;Laporan harian otomatis</label></div>
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Reporting.AutoWeekly" /> &nbsp;Laporan mingguan otomatis</label></div>
+            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Reporting.AutoMonthly" /> &nbsp;Laporan bulanan otomatis</label></div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private AppConfig _c = new();
+    private string _rssText = "";
+    private string _redditSubs = "", _mastoTags = "", _ytTerms = "", _twTerms = "", _fbPages = "", _onionUrls = "";
+    private bool _saved;
+
+    protected override void OnInitialized()
+    {
+        // Deep-clone current config so edits are not applied until Save.
+        _c = JsonSerializer.Deserialize<AppConfig>(JsonSerializer.Serialize(Config.Current))!;
+        _rssText = string.Join('\n', _c.Crawler.RssFeeds);
+        _redditSubs = string.Join('\n', _c.Social.Reddit.Subreddits);
+        _mastoTags = string.Join('\n', _c.Social.Mastodon.Hashtags);
+        _ytTerms = string.Join('\n', _c.Social.YouTube.SearchTerms);
+        _twTerms = string.Join('\n', _c.Social.Twitter.SearchTerms);
+        _fbPages = string.Join('\n', _c.Social.Facebook.PageIds);
+        _onionUrls = string.Join('\n', _c.DarkWeb.OnionUrls);
+    }
+
+    private static List<string> Lines(string s) =>
+        s.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+    private async Task Save()
+    {
+        _c.Crawler.RssFeeds = Lines(_rssText);
+        _c.Social.Reddit.Subreddits = Lines(_redditSubs);
+        _c.Social.Mastodon.Hashtags = Lines(_mastoTags);
+        _c.Social.YouTube.SearchTerms = Lines(_ytTerms);
+        _c.Social.Twitter.SearchTerms = Lines(_twTerms);
+        _c.Social.Facebook.PageIds = Lines(_fbPages);
+        _c.DarkWeb.OnionUrls = Lines(_onionUrls);
+        Config.Save(_c);
+        await Audit.LogAsync(Auth.CurrentUsername, "settings.update", "Memperbarui konfigurasi aplikasi", Auth.CurrentUserId);
+        _saved = true;
+        StateHasChanged();
+        await Task.Delay(2000);
+        _saved = false;
+        StateHasChanged();
+    }
+}

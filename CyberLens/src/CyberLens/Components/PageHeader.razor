@@ -1,0 +1,18 @@
+@* Standard page title block, rendered at the top of each page's content. *@
+<div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px">
+    <div>
+        <div class="page-eyebrow">// @Eyebrow</div>
+        <h1 class="page-title" style="font-size:30px;margin-top:2px">@Title</h1>
+    </div>
+    @if (ChildContent is not null)
+    {
+        <div class="spacer" style="flex:1"></div>
+        <div class="row wrap">@ChildContent</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string Eyebrow { get; set; } = "";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

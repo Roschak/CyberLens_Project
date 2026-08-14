@@ -1,0 +1,99 @@
+@page "/alerts"
+@inject IDbContextFactory<CyberLensDbContext> DbFactory
+@inject NotificationBus Bus
+@implements IDisposable
+
+<PageTitle>Alert — CyberLens</PageTitle>
+
+<PageHeader Title="Alert &amp; Notifikasi" Eyebrow="real-time keyword hits">
+    <button class="btn" @onclick="MarkAllRead"><Icon Name="check" Size="16" /> Tandai semua dibaca</button>
+</PageHeader>
+
+<div class="toolbar">
+    <div class="seg-toggle">
+        <button class="@(_filter == "all" ? "on" : "")" @onclick='() => SetFilter("all")'>Semua</button>
+        <button class="@(_filter == "unread" ? "on" : "")" @onclick='() => SetFilter("unread")'>Belum dibaca</button>
+        <button class="@(_filter == "critical" ? "on" : "")" @onclick='() => SetFilter("critical")'>Kritis</button>
+    </div>
+</div>
+
+@if (_loading) { <div class="center-load"><div class="spin"></div></div> }
+else if (_alerts.Count == 0) { <div class="card pad"><div class="empty">Tidak ada alert.</div></div> }
+else
+{
+    <div class="grid">
+        @foreach (var a in _alerts)
+        {
+            <div class="card pad" style="@(a.IsRead ? "opacity:0.7" : "")border-left:6px solid @SevBar(a.Severity)">
+                <div class="row" style="justify-content:space-between;margin-bottom:6px">
+                    <div class="row" style="gap:8px">
+                        <span class="badge @SevClass(a.Severity)">@a.Severity</span>
+                        @if (a.Keyword is not null) { <span class="tag-chip">@a.Keyword.Term</span> }
+                        @if (!a.IsRead) { <span class="badge pos"><span class="d" style="background:var(--pos)"></span>BARU</span> }
+                    </div>
+                    <span class="mono" style="font-size:11px;color:var(--ink-mute)">@a.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</span>
+                </div>
+                <div style="font-weight:700;margin-bottom:4px">@a.Title</div>
+                <div style="font-size:13.5px;color:var(--ink-soft)">@a.Message</div>
+                @if (!a.IsRead)
+                {
+                    <div style="margin-top:10px"><button class="btn sm ghost" @onclick="() => MarkRead(a)"><Icon Name="eye" Size="14" /> Tandai dibaca</button></div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Alert> _alerts = new();
+    private bool _loading = true;
+    private string _filter = "all";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+        Bus.AlertRaised += OnAlert;
+    }
+
+    private async Task Load()
+    {
+        _loading = true; StateHasChanged();
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var q = db.Alerts.Include(a => a.Keyword).AsQueryable();
+        if (_filter == "unread") q = q.Where(a => !a.IsRead);
+        else if (_filter == "critical") q = q.Where(a => a.Severity == AlertSeverity.Critical);
+        _alerts = await q.OrderByDescending(a => a.CreatedAt).Take(80).ToListAsync();
+        _loading = false; StateHasChanged();
+    }
+
+    private async Task SetFilter(string f) { _filter = f; await Load(); }
+
+    private async Task MarkRead(Alert a)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var e = await db.Alerts.FindAsync(a.Id);
+        if (e is not null) { e.IsRead = true; await db.SaveChangesAsync(); }
+        a.IsRead = true;
+        StateHasChanged();
+    }
+
+    private async Task MarkAllRead()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        await db.Alerts.Where(a => !a.IsRead).ExecuteUpdateAsync(s => s.SetProperty(a => a.IsRead, true));
+        await Load();
+    }
+
+    private async void OnAlert(Alert a) => await InvokeAsync(Load);
+
+    private static string SevClass(AlertSeverity s) => s switch
+    {
+        AlertSeverity.Critical => "neg", AlertSeverity.Warning => "neu", _ => "pos"
+    };
+    private static string SevBar(AlertSeverity s) => s switch
+    {
+        AlertSeverity.Critical => "var(--red)", AlertSeverity.Warning => "var(--amber)", _ => "var(--blue)"
+    };
+
+    public void Dispose() => Bus.AlertRaised -= OnAlert;
+}

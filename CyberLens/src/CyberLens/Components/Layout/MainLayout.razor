@@ -1,0 +1,178 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject NotificationBus Bus
+@inject CyberLens.Services.Collection.CrawlerStatusService Crawler
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<div class="strip">
+    <span class="dot"></span>
+    <span>// CYBERLENS</span>
+    <span class="seg hide-sm">OSINT INTELLIGENCE CONSOLE</span>
+    <span class="spacer"></span>
+    <a href="/crawler" class="seg" style="text-decoration:none;display:flex;align-items:center;gap:6px" title="Status crawler">
+        <span style="width:8px;height:8px;border-radius:50%;background:@CrawlerColor;@(Crawler.IsCollecting ? "animation:pulse 1.1s infinite" : "")"></span>
+        CRAWLER: @CrawlerLabel
+    </a>
+    <span class="seg" @ref="_clockRef">—</span>
+</div>
+
+<div class="shell">
+    <NavMenu UnreadAlerts="_unread" />
+
+    <div class="main">
+        <div class="topbar">
+            <div class="spacer"></div>
+
+            <div class="icon-btn" @onclick="ToggleNotifs" title="Notifikasi">
+                <Icon Name="bell" />
+                @if (_unread > 0)
+                {
+                    <span class="count">@(_unread > 99 ? "99+" : _unread.ToString())</span>
+                }
+            </div>
+            <div class="icon-btn" @onclick="ToggleTheme" title="Ganti tema">
+                <Icon Name="@(_theme == "dark" ? "sun" : "moon")" />
+            </div>
+
+            <AuthorizeView>
+                <Authorized>
+                    <div class="row">
+                        <div style="width:38px;height:38px;border:2.5px solid var(--ink);border-radius:3px;display:grid;place-items:center;font-weight:800;font-family:var(--font-display);background:@(AvatarColor(context));color:#fff;box-shadow:var(--shadow-sm)">
+                            @Initials(context)
+                        </div>
+                        <form method="post" action="/auth/logout">
+                            <AntiforgeryToken />
+                            <button class="icon-btn" type="submit" title="Keluar"><Icon Name="logout" /></button>
+                        </form>
+                    </div>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+
+        @if (_showNotifs)
+        {
+            <div class="card dropdown">
+                <div class="card-h"><span class="field">// intel_feed</span><h3>Notifikasi</h3></div>
+                <div class="card-b" style="padding:8px">
+                    @if (_recent.Count == 0)
+                    {
+                        <div class="empty">Belum ada notifikasi baru.</div>
+                    }
+                    else
+                    {
+                        @foreach (var n in _recent)
+                        {
+                            <div style="padding:10px;border-bottom:1.5px solid var(--line)">
+                                <div class="row" style="gap:8px;margin-bottom:3px">
+                                    <span class="badge @SevClass(n.Severity)">@n.Severity</span>
+                                    <span class="mono" style="font-size:10px;color:var(--ink-mute)">@n.CreatedAt.ToLocalTime().ToString("HH:mm")</span>
+                                </div>
+                                <div style="font-size:13px;font-weight:600">@n.Title</div>
+                            </div>
+                        }
+                        <div style="padding:8px"><a href="/alerts" class="btn sm ghost" @onclick="() => _showNotifs=false">Lihat semua alert →</a></div>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="content">
+            @Body
+        </div>
+    </div>
+</div>
+
+<CascadingValue Value="this">
+    <div class="toast-stack">
+        @foreach (var t in _toasts)
+        {
+            <div class="toast">
+                <div class="th">
+                    <span class="badge @SevClass(t.Severity)">@t.Severity</span> ALERT BARU
+                    <span class="spacer" style="flex:1"></span>
+                    <span class="toast-x" title="Tutup" @onclick="() => CloseToast(t)">✕</span>
+                </div>
+                <div style="font-size:13.5px;font-weight:600;margin-top:6px">@t.Title</div>
+                <div style="font-size:12px;color:var(--ink-soft);margin-top:3px">@Truncate(t.Message, 110)</div>
+            </div>
+        }
+    </div>
+</CascadingValue>
+
+@code {
+    [CascadingParameter] public HttpContext? Http { get; set; }
+    private ElementReference _clockRef;
+    private string _theme = "light";
+    private bool _showNotifs;
+    private int _unread;
+    private readonly List<Alert> _recent = new();
+    private readonly List<Alert> _toasts = new();
+
+    private string CrawlerLabel => Crawler.State switch { "running" => "RUNNING", "idle" => "IDLE", _ => "OFF" };
+    private string CrawlerColor => Crawler.State switch { "running" => "#2ecc71", "idle" => "#F5A700", _ => "#CC3B2E" };
+
+    protected override void OnInitialized()
+    {
+        Bus.AlertRaised += OnAlert;
+        Crawler.Changed += OnCrawlerChanged;
+    }
+
+    private async void OnCrawlerChanged() => await InvokeAsync(StateHasChanged);
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (first)
+        {
+            _theme = await JS.InvokeAsync<string>("cyberlens.currentTheme");
+            await JS.InvokeVoidAsync("cyberlens.startClock", _clockRef);
+            await LoadUnread();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadUnread()
+    {
+        // lightweight: reuse a scoped context via DI would be cleaner, but the bell count is refreshed on alerts too.
+        _unread = _recent.Count;
+        await Task.CompletedTask;
+    }
+
+    private async void OnAlert(Alert alert)
+    {
+        await InvokeAsync(() =>
+        {
+            _unread++;
+            _recent.Insert(0, alert);
+            if (_recent.Count > 12) _recent.RemoveAt(_recent.Count - 1);
+            _toasts.Add(alert);
+            while (_toasts.Count > 3) _toasts.RemoveAt(0);
+            StateHasChanged();
+        });
+        await Task.Delay(6000);
+        await InvokeAsync(() => { _toasts.Remove(alert); StateHasChanged(); });
+    }
+
+    private void CloseToast(Alert t) { _toasts.Remove(t); StateHasChanged(); }
+
+    private async Task ToggleTheme() => _theme = await JS.InvokeAsync<string>("cyberlens.toggleTheme");
+    private void ToggleNotifs() { _showNotifs = !_showNotifs; if (_showNotifs) _unread = 0; }
+
+    public void SetUnread(int n) { _unread = n; InvokeAsync(StateHasChanged); }
+
+    private static string SevClass(AlertSeverity s) => s switch
+    {
+        AlertSeverity.Critical => "neg", AlertSeverity.Warning => "neu", _ => "pos"
+    };
+    private static string Truncate(string s, int n) => s.Length > n ? s[..n] + "…" : s;
+    private static string Initials(AuthenticationState ctx)
+    {
+        var name = ctx.User.FindFirst("display_name")?.Value ?? ctx.User.Identity?.Name ?? "?";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 ? $"{parts[0][0]}{parts[1][0]}".ToUpper() : name[..Math.Min(2, name.Length)].ToUpper();
+    }
+    private static string AvatarColor(AuthenticationState ctx) =>
+        ctx.User.FindFirst("avatar_color")?.Value ?? "#FF4D00";
+
+    public void Dispose() { Bus.AlertRaised -= OnAlert; Crawler.Changed -= OnCrawlerChanged; }
+}

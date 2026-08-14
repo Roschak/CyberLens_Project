@@ -1,0 +1,18 @@
+# Build output
+bin/
+obj/
+publish/
+
+# Runtime data & secrets (created on first run)
+src/CyberLens/data/
+src/CyberLens/config/
+src/CyberLens/storage/
+
+# IDE
+.vs/
+.idea/
+*.user
+
+# OS
+.DS_Store
+Thumbs.db

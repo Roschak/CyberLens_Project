@@ -1,0 +1,52 @@
+@inject NavigationManager Nav
+
+<div class="sidebar">
+    <div class="brand">
+        <div class="logo">
+            <div class="mark"><Icon Name="lens" Size="20" /></div>
+            <div>
+                <div class="name">CyberLens</div>
+                <div class="tag">OSINT // MEDIA INTEL</div>
+            </div>
+        </div>
+    </div>
+
+    <nav class="nav">
+        <div class="nav-sec">Intel</div>
+        <NavItem Href="" Icon="dashboard" Label="Dashboard" />
+        <NavItem Href="ai-analytics" Icon="sparkles" Label="AI Analytics" />
+        <NavItem Href="feed" Icon="feed" Label="Live Feed" />
+        <NavItem Href="trends" Icon="trend" Label="Tren & Prediksi" />
+        <NavItem Href="network" Icon="network" Label="Jaringan Entitas" />
+        <NavItem Href="geomap" Icon="map" Label="Peta Geospasial" />
+        <NavItem Href="globe" Icon="globe" Label="Globe 3D Intelijen" />
+        <NavItem Href="darkweb" Icon="darkweb" Label="Dark Web" />
+
+        <div class="nav-sec">Operasi</div>
+        <NavItem Href="crawler" Icon="feed" Label="Crawler Ops" />
+        <NavItem Href="keywords" Icon="keyword" Label="Kata Kunci" />
+        <NavItem Href="alerts" Icon="alert" Label="Alert" Badge="@UnreadAlerts" />
+        <NavItem Href="sources" Icon="sources" Label="Sumber" />
+        <NavItem Href="reports" Icon="report" Label="Laporan" />
+        <NavItem Href="chat" Icon="chat" Label="Bang Kevin" />
+
+        <div class="nav-sec">Admin</div>
+        <NavItem Href="users" Icon="users" Label="Pengguna" />
+        <NavItem Href="audit" Icon="audit" Label="Audit Trail" />
+        <NavItem Href="settings" Icon="settings" Label="Pengaturan" />
+    </nav>
+
+    <div style="margin-top:auto;padding:14px;border-top:2.5px solid var(--line)">
+        <a href="/swagger" target="_blank" class="btn sm ghost" style="width:100%;justify-content:center">
+            <Icon Name="globe" Size="15" /> REST API / Swagger
+        </a>
+        <div class="mono" style="font-size:9.5px;line-height:1.5;color:var(--ink-mute);margin-top:12px;text-align:center">
+            Dibuat oleh <span style="color:var(--accent);font-weight:600">Gravicode Studios</span><br />
+            dipimpin oleh Kang Fadhil
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int UnreadAlerts { get; set; }
+}

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <title>CyberLens — OSINT Intelligence Console</title>
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["CyberLens.styles.css"]" />
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-cloud/1.2.7/d3.layout.cloud.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <ImportMap />
+    <HeadOutlet />
+</head>
+
+<body>
+    <script>
+        // Apply saved theme before first paint to avoid a flash.
+        (function () {
+            try { document.documentElement.setAttribute('data-theme', localStorage.getItem('cl-theme') || 'light'); } catch (e) { }
+        })();
+    </script>
+    <Routes @rendermode="InteractiveServer" />
+    <div id="blazor-error-ui" data-nosnippet>
+        Terjadi kesalahan tak terduga.
+        <a href="." class="reload">Muat ulang</a>
+        <span class="dismiss">🗙</span>
+    </div>
+    <script src="@Assets["js/app.js"]"></script>
+    <script src="@Assets["js/charts.js"]"></script>
+    <script type="module" src="@Assets["js/globe.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>

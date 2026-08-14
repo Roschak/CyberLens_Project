@@ -1,0 +1,110 @@
+@page "/keywords"
+@inject IDbContextFactory<CyberLensDbContext> DbFactory
+@inject AuthService Auth
+@inject AuditService Audit
+
+<PageTitle>Kata Kunci — CyberLens</PageTitle>
+
+<PageHeader Title="Kata Kunci Pantauan" Eyebrow="keyword monitoring">
+    <button class="btn accent" @onclick="() => _adding = !_adding"><Icon Name="plus" Size="16" /> Tambah kata kunci</button>
+</PageHeader>
+
+@if (_adding)
+{
+    <div class="card pad" style="margin-bottom:18px">
+        <div class="row wrap" style="align-items:flex-end">
+            <div style="flex:1;min-width:200px">
+                <label class="fld">Kata kunci / frasa</label>
+                <input class="inp" @bind="_newTerm" placeholder="mis. kebocoran data" />
+            </div>
+            <div style="min-width:160px">
+                <label class="fld">Tingkat severity</label>
+                <select class="inp" @bind="_newSeverity">
+                    <option value="Info">Info</option>
+                    <option value="Warning">Warning</option>
+                    <option value="Critical">Critical</option>
+                </select>
+            </div>
+            <button class="btn accent" @onclick="Add"><Icon Name="check" Size="16" /> Simpan</button>
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="tbl-wrap">
+        <table class="tbl">
+            <thead>
+                <tr><th>Kata Kunci</th><th>Severity</th><th>Deteksi</th><th>Real-time</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var k in _keywords)
+                {
+                    <tr>
+                        <td style="font-weight:600">@k.Term</td>
+                        <td><span class="badge @SevClass(k.Severity)">@k.Severity</span></td>
+                        <td class="mono">@k.HitCount</td>
+                        <td>@(k.NotifyRealtime ? "✓" : "—")</td>
+                        <td>
+                            <button class="btn sm ghost" @onclick="() => Toggle(k)">
+                                @(k.IsActive ? "AKTIF" : "NONAKTIF")
+                            </button>
+                        </td>
+                        <td><button class="btn sm ghost" @onclick="() => Remove(k)"><Icon Name="trash" Size="14" /></button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private List<WatchKeyword> _keywords = new();
+    private bool _adding;
+    private string _newTerm = "";
+    private string _newSeverity = "Warning";
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        _keywords = await db.WatchKeywords.OrderByDescending(k => k.HitCount).ToListAsync();
+    }
+
+    private async Task Add()
+    {
+        if (string.IsNullOrWhiteSpace(_newTerm)) return;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.WatchKeywords.Add(new WatchKeyword
+        {
+            Term = _newTerm.Trim(),
+            Severity = Enum.Parse<AlertSeverity>(_newSeverity),
+            CreatedById = Auth.CurrentUserId
+        });
+        await db.SaveChangesAsync();
+        await Audit.LogAsync(Auth.CurrentUsername, "keyword.create", $"Menambahkan '{_newTerm}'", Auth.CurrentUserId);
+        _newTerm = ""; _adding = false;
+        await Load();
+    }
+
+    private async Task Toggle(WatchKeyword k)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var e = await db.WatchKeywords.FindAsync(k.Id);
+        if (e is not null) { e.IsActive = !e.IsActive; await db.SaveChangesAsync(); }
+        await Load();
+    }
+
+    private async Task Remove(WatchKeyword k)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var e = await db.WatchKeywords.FindAsync(k.Id);
+        if (e is not null) { db.WatchKeywords.Remove(e); await db.SaveChangesAsync(); }
+        await Load();
+    }
+
+    private static string SevClass(AlertSeverity s) => s switch
+    {
+        AlertSeverity.Critical => "neg", AlertSeverity.Warning => "neu", _ => "pos"
+    };
+}
