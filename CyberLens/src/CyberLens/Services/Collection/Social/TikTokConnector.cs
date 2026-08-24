@@ -35,11 +35,10 @@ public class TikTokConnector(IHttpClientFactory httpFactory) : ISocialConnector
             })
         };
         using var tokResp = await http.SendAsync(tokReq, ct);
-        if (!tokResp.IsSuccessStatusCode)
-            throw new InvalidOperationException($"TikTok OAuth HTTP {(int)tokResp.StatusCode}");
+        if (!tokResp.IsSuccessStatusCode) return Array.Empty<CollectedItem>(); // skip — jangan throw
         using var tokDoc = JsonDocument.Parse(await tokResp.Content.ReadAsStringAsync(ct));
         if (!tokDoc.RootElement.TryGetProperty("access_token", out var at))
-            throw new InvalidOperationException("TikTok OAuth: no access_token in response");
+            return Array.Empty<CollectedItem>(); // skip — jangan throw
         var token = at.GetString();
 
         // 2. Video query (Research API). Requires an approved research/display app.

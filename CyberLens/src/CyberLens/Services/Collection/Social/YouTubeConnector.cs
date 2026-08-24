@@ -27,8 +27,7 @@ public class YouTubeConnector(IHttpClientFactory httpFactory) : ISocialConnector
                       $"?part=snippet&type=video&order=date&maxResults={Math.Clamp(c.MaxResults, 1, 25)}" +
                       $"&q={Uri.EscapeDataString(term.Trim())}&key={c.ApiKey}";
             using var resp = await http.GetAsync(url, ct);
-            if (!resp.IsSuccessStatusCode)
-                throw new InvalidOperationException($"YouTube API HTTP {(int)resp.StatusCode}");
+            if (!resp.IsSuccessStatusCode) continue; // skip — jangan throw, biar connector lain lanjut
             using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
             if (!doc.RootElement.TryGetProperty("items", out var arr)) continue;
 

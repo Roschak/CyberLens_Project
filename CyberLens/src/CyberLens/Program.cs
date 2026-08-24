@@ -159,6 +159,9 @@ app.MapGet("/files/{**path}", async (string path, StorageService storage) =>
 // ---- REST API ----
 app.MapCyberLensApi();
 
+// ---- Health check (tanpa API key) ----
+app.MapHealthCheck();
+
 // Provide the base URL to ChatService so image attachments resolve to absolute URLs.
 var serverUrl = builder.Configuration["urls"]?.Split(';').FirstOrDefault()
     ?? app.Urls.FirstOrDefault() ?? "http://localhost:5000";

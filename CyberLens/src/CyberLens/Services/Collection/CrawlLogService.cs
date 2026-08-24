@@ -27,7 +27,7 @@ public class CrawlLogService(IDbContextFactory<CyberLensDbContext> dbFactory)
             runs.Select(r => r.Connector).Distinct().Count());
     }
 
-    public async Task<List<CrawlRun>> GetRunsAsync(DateTime since, string? connector, string? status, string? trigger, int limit = 200)
+    public async Task<List<CrawlRun>> GetRunsAsync(DateTime since, string? connector, string? status, string? trigger, int? limit = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var q = db.CrawlRuns.Where(r => r.StartedAt >= since);
@@ -35,7 +35,9 @@ public class CrawlLogService(IDbContextFactory<CyberLensDbContext> dbFactory)
         if (status == "success") q = q.Where(r => r.Success);
         else if (status == "failed") q = q.Where(r => !r.Success);
         if (!string.IsNullOrWhiteSpace(trigger)) q = q.Where(r => r.Trigger == trigger);
-        return await q.OrderByDescending(r => r.StartedAt).Take(limit).ToListAsync();
+        IQueryable<CrawlRun> query = q.OrderByDescending(r => r.StartedAt);
+        if (limit is { } l) query = query.Take(l);
+        return await query.ToListAsync();
     }
 
     public async Task<List<CrawlDaily>> GetDailyAddedAsync(int days)

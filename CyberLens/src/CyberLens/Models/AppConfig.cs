@@ -95,6 +95,20 @@ public class CrawlerConfig
     public int RetentionDays { get; set; } = 30;
     /// <summary>Jumlah maksimal baris Log Aktivitas Crawler yang disimpan (log paling lama otomatis dibuang).</summary>
     public int MaxCrawlRunsToKeep { get; set; } = 500;
+
+    // ---- Stabilitas & resilience ----
+    /// <summary>Jumlah maksimal kegagalan berturut-turut sebelum crawler otomatis dimatikan (0 = nonaktif).</summary>
+    public int MaxConsecutiveFailures { get; set; } = 10;
+    /// <summary>Jumlah retry per HTTP request jika gagal (0 = tanpa retry).</summary>
+    public int RetryCount { get; set; } = 2;
+    /// <summary>Timeout per HTTP request dalam detik (individual connector timeout).</summary>
+    public int RequestTimeoutSeconds { get; set; } = 30;
+    /// <summary>Batas item yang diambil dari pencarian kata kunci per siklus (jangan biarkan keyword search menghabiskan seluruh budget).</summary>
+    public int MaxItemsPerKeyword { get; set; } = 10;
+    /// <summary>Batas post baru yang diizinkan masuk ke DB per siklus dari SEMUA keyword digabung.</summary>
+    public int MaxNewPostsPerCycleKeyword { get; set; } = 50;
+    /// <summary>Jumlah maksimal connector yang diproses per siklus (mencegah siklus terlalu panjang).</summary>
+    public int MaxConnectorsPerCycle { get; set; } = 30;
     /// <summary>
     /// Real RSS/Atom feeds ingested live — semuanya media Indonesia (nasional + daerah, terverifikasi aktif).
     /// Tambah/hapus dari Settings.

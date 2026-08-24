@@ -24,8 +24,7 @@ public class ThreadsConnector(IHttpClientFactory httpFactory) : ISocialConnector
                   "?fields=text,permalink,timestamp,username" +
                   $"&limit={Math.Clamp(c.MaxResults, 1, 25)}&access_token={c.AccessToken}";
         using var resp = await http.GetAsync(url, ct);
-        if (!resp.IsSuccessStatusCode)
-            throw new InvalidOperationException($"Threads API HTTP {(int)resp.StatusCode}");
+        if (!resp.IsSuccessStatusCode) return Array.Empty<CollectedItem>(); // skip — jangan throw
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
         if (!doc.RootElement.TryGetProperty("data", out var arr)) return Array.Empty<CollectedItem>();
 

@@ -163,7 +163,7 @@
     private async Task Reload()
     {
         _stats = await Logs.GetStatsAsync(Since);
-        _runs = await Logs.GetRunsAsync(Since, _connector, _status, _trigger, 200);
+        _runs = await Logs.GetRunsAsync(Since, _connector, _status, _trigger);
         _daily = await Logs.GetDailyAddedAsync(_days < 1 ? 1 : _days);
         _perConnector = await Logs.GetPerConnectorAsync(Since);
         _locations = await Logs.GetTopLocationsAsync(Since);

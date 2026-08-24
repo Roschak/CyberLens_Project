@@ -30,8 +30,7 @@ public class TwitterConnector(IHttpClientFactory httpFactory) : ISocialConnector
             using var req = new HttpRequestMessage(HttpMethod.Get, url);
             req.Headers.Add("Authorization", $"Bearer {c.BearerToken}");
             using var resp = await http.SendAsync(req, ct);
-            if (!resp.IsSuccessStatusCode)
-                throw new InvalidOperationException($"X API HTTP {(int)resp.StatusCode}");
+            if (!resp.IsSuccessStatusCode) continue; // skip — jangan throw, biar connector lain lanjut
             using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
             if (!doc.RootElement.TryGetProperty("data", out var arr)) continue;
 

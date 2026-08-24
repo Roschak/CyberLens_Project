@@ -29,8 +29,7 @@ public class FacebookConnector(IHttpClientFactory httpFactory) : ISocialConnecto
                       "?fields=message,created_time,permalink_url,shares,likes.summary(true),comments.summary(true)" +
                       $"&limit={Math.Clamp(c.MaxPerPage, 1, 25)}&access_token={c.AccessToken}";
             using var resp = await http.GetAsync(url, ct);
-            if (!resp.IsSuccessStatusCode)
-                throw new InvalidOperationException($"Facebook Graph HTTP {(int)resp.StatusCode}");
+            if (!resp.IsSuccessStatusCode) continue; // skip — jangan throw, biar connector lain lanjut
             using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
             if (!doc.RootElement.TryGetProperty("data", out var arr)) continue;
 

@@ -1,6 +1,7 @@
 using CyberLens.Data;
 using CyberLens.Services;
 using CyberLens.Services.Analysis;
+using CyberLens.Services.Collection;
 using CyberLens.Services.Reporting;
 using Microsoft.EntityFrameworkCore;
 
@@ -132,6 +133,45 @@ public static class ApiEndpoints
 
     public record KeywordDto(string Term, string Severity);
     public record ReportRequestDto(string Kind, string Format);
+
+    // ---- Health check endpoint (tanpa API key, untuk monitoring) ----
+    public static void MapHealthCheck(this WebApplication app)
+    {
+        app.MapGet("/health", async (
+            CrawlerStatusService status,
+            IDbContextFactory<CyberLensDbContext> dbf,
+            IServiceProvider sp) =>
+        {
+            var health = new Dictionary<string, object>();
+            try
+            {
+                await using var db = await dbf.CreateDbContextAsync();
+                var postCount = await db.Posts.CountAsync();
+                var sourceCount = await db.Sources.CountAsync();
+                var alertCount = await db.Alerts.CountAsync();
+                var keywordCount = await db.WatchKeywords.CountAsync();
+                health["db"] = "ok";
+                health["posts"] = postCount;
+                health["sources"] = sourceCount;
+                health["alerts"] = alertCount;
+                health["keywords"] = keywordCount;
+            }
+            catch (Exception ex)
+            {
+                health["db"] = $"error: {ex.Message}";
+            }
+
+            health["crawler_state"] = status.State;
+            health["crawler_last_run"] = status.LastRunAt?.ToString("o") ?? "never";
+            health["crawler_total_passes"] = status.TotalPasses;
+            health["timestamp"] = DateTime.UtcNow.ToString("o");
+
+            var isHealthy = health.ContainsKey("db") && health["db"]?.ToString() == "ok";
+            return isHealthy
+                ? Results.Ok(health)
+                : Results.Json(health, statusCode: 503);
+        }).WithSummary("Health check endpoint").AllowAnonymous();
+    }
 }
 
 /// <summary>Validates the X-Api-Key header against the configured API key.</summary>

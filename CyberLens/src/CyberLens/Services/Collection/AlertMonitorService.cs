@@ -40,13 +40,17 @@ public class AlertMonitorService(
         var keywords = await db.WatchKeywords.Where(k => k.IsActive).ToListAsync(ct);
         if (keywords.Count == 0) return;
 
+        // Batasi jumlah post yang di-scan per siklus agar tidak OOM
         var fresh = await db.Posts.Include(p => p.Source)
             .Where(p => p.CollectedAt >= scanFrom)
             .OrderBy(p => p.CollectedAt).Take(200).ToListAsync(ct);
         if (fresh.Count == 0) return;
 
+        // Batch mode: kumpulkan semua alert lalu SaveChangesAsync sekali
+        var alerts = new List<Alert>();
         foreach (var post in fresh)
         {
+            ct.ThrowIfCancellationRequested();
             foreach (var kw in keywords)
             {
                 var tagForm = kw.Term.Replace(' ', '-');
@@ -61,11 +65,18 @@ public class AlertMonitorService(
                     Message = post.Content.Length > 180 ? post.Content[..177] + "..." : post.Content,
                 };
                 db.Alerts.Add(alert);
-                await db.SaveChangesAsync(ct);
-                if (kw.NotifyRealtime)
+                alerts.Add(alert);
+            }
+        }
+
+        if (alerts.Count > 0)
+        {
+            // SaveChangesAsync sekali untuk seluruh batch — lebih cepat & lebih aman
+            await db.SaveChangesAsync(ct);
+            foreach (var alert in alerts)
+            {
+                if (alert.Keyword?.NotifyRealtime == true)
                 {
-                    alert.Keyword = kw;
-                    alert.Post = post;
                     bus.PublishAlert(alert);
                 }
             }
