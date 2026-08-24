@@ -12,14 +12,14 @@ Built with **Blazor Server (.NET 10)**, **D3.js**, and **Semantic Kernel**, in a
 
 ## Features
 
-- **Data collection** — **real, live** crawlers with a pluggable connector framework: RSS/Atom (Antara, Google News ID, BBC World), **Reddit** and **Mastodon** (real, no keys needed), plus **YouTube, Twitter/X, Facebook, Threads, TikTok** via their official APIs (enable + add credentials in Settings), and an optional **simulated** stream for demo. Runs **on a schedule** (background) or **on demand** ("Crawl sekarang"). Every item is normalized, de-duplicated by content hash, sentiment-scored, auto-categorized, tagged, and geocoded.
+- **Data collection** — **real, live** crawlers: **20 Indonesian RSS/Atom feeds by default** (8 nasional — Antara, Google News ID, CNN Indonesia, Tempo, CNBC Indonesia, Okezone, Detik, Sindonews — plus 12 media daerah: Radar Bandung/Cirebon/Banten/Pekalongan/Makassar/Ambon, Jabar Ekspres, Berita Jatim, Harian Bhirawa, Waspada Medan, Riau Pos, Sumsel Update) + **automatic Google News Indonesia search per active watch keyword** — all **Dalam Negeri** (Indonesia only) by default. Social connectors (Reddit, Mastodon, YouTube, Twitter/X, Facebook, Threads, TikTok) are **OFF** until enabled manually in Settings. Runs **on a schedule** (background, 120s default) or **on demand** ("Crawl sekarang"). Every item is normalized, de-duplicated by content hash, sentiment-scored, auto-categorized, tagged, and geocoded. **No simulated data** — everything stored comes from real feeds/APIs.
 - **Crawler Ops dashboard** — collection statistics and activity logs in charts + a filterable table: runs, items collected, success rate, average duration; items-per-day, success/fail, items-per-connector, and top-locations charts; filters by period, connector/source, status, and trigger. A **live running indicator** (classification strip + status banner) shows whether the crawler is running, idle, or off.
 - **Processing** — multi-language (ID/EN) lexicon sentiment analysis with negation handling, keyword-based topic classification (Politik, Ekonomi, Keamanan, Teknologi, Sosial, Kesehatan, Lingkungan).
 - **Analysis & intelligence** — dashboard stats, trend analysis, real-time keyword monitoring, entity network analysis, geospatial analysis, and **AI-based prediction** (linear-regression volume forecast).
 - **AI Analytics** — an **LLM-generated intelligence brief** from the crawled data: executive summary, risk assessment, key findings, recommendations, top threats, and a 7-day outlook, alongside supporting charts. Runs on your configured provider (OpenAI / Anthropic / Gemini / Ollama).
 - **Visualization** — interactive D3.js dashboard: trend lines with forecast, sentiment donut, category bars, word cloud, force-directed entity graph, and a **Leaflet** geospatial map with real tiles.
 - **3D intelligence globe** — a **Three.js / WebGL** interactive Earth that maps OSINT spatially: sentiment heatmap (red = negative, green = positive, yellow = neutral), source geolocation markers, event-clustering bubbles (size = intensity), a timeline overlay (play the evolution over time), and a threat-intelligence layer — all toggleable, with drag-to-rotate and scroll-to-zoom.
-- **Alerting & reporting** — real-time keyword alerts (in-app toasts + notification bell), scheduled auto-reports (daily/weekly/monthly), and PDF (QuestPDF) / Excel (ClosedXML) export.
+- **Alerting & reporting** — real-time keyword alerts (in-app toasts + notification bell), where each active keyword is also searched automatically via Google News Indonesia, scheduled auto-reports (daily/weekly/monthly), and PDF (QuestPDF) / Excel (ClosedXML) export.
 - **Collaboration & security** — multi-user with role-based access (Viewer / Analyst / Admin), PBKDF2 password hashing, audit trail, cookie authentication.
 - **"Bang Kevin" AI assistant** — multi-session chat (create / delete / reset) with **clickable example prompts**, image & document attachments, Markdown rendering (tables, media, code). Built on Semantic Kernel with **switchable providers: OpenAI, Anthropic, Gemini, Ollama**, and kernel functions for Tavily web search, page scraping, reading files from URLs, date/time, math, and querying the platform's own OSINT data.
 - **Dark web monitoring** and a **REST API** (Minimal API + Swagger) for external integration.
@@ -114,7 +114,7 @@ src/CyberLens/
 
 ## Notes
 
-- The simulated social-media stream and all sample data are **fictional**, for demonstration. Disable it in Settings and add real RSS feeds (or wire real social APIs) for production use.
+- Collection is **real-data only**: the app stores items from real RSS/Atom feeds and real social APIs. No simulated stream and no sample posts — a legacy cleanup removes demo rows left by older versions.
 - Set a real AI provider API key in Settings to activate Bang Kevin.
 
 ## Credits

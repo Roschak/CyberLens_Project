@@ -72,20 +72,61 @@ public class TavilyConfig
     public string ApiKey { get; set; } = "";
 }
 
+public enum CrawlerMode
+{
+    DalamNegeri,
+    LuarNegeri
+}
+
 public class CrawlerConfig
 {
     public bool Enabled { get; set; } = true;
-    public int IntervalSeconds { get; set; } = 45;
-    /// <summary>When true, generates realistic simulated social-media traffic (demo mode, no API keys needed).</summary>
-    public bool SimulateSocialStreams { get; set; } = true;
-    /// <summary>Real RSS/Atom feeds ingested live (news portals, Google News, etc.). Add or remove from Settings.</summary>
+    public int IntervalSeconds { get; set; } = 120;
+    
+    /// <summary>Pilih apakah crawler akan mengambil berita seluruh dunia (LuarNegeri) atau hanya dari Indonesia (DalamNegeri).</summary>
+    public CrawlerMode Mode { get; set; } = CrawlerMode.DalamNegeri;
+    /// <summary>Batas item yang diambil dari tiap feed/connector per siklus (mencegah data membengkak).</summary>
+    public int MaxItemsPerFeed { get; set; } = 15;
+    /// <summary>Batas total post BARU yang boleh masuk DB per siklus crawler — setelah tercapai, sisa feed/connector dilewati hingga siklus berikutnya.</summary>
+    public int MaxNewPostsPerCycle { get; set; } = 200;
+    /// <summary>Panjang maksimal teks berita (karakter) yang disimpan — konten lebih panjang dipotong agar hemat ruang &amp; token AI.</summary>
+    public int MaxContentLength { get; set; } = 2000;
+    /// <summary>Hapus otomatis post yang lebih tua dari N hari (0 = nonaktif). Menjaga DB tetap kecil &amp; cepat.</summary>
+    public int RetentionDays { get; set; } = 30;
+    /// <summary>Jumlah maksimal baris Log Aktivitas Crawler yang disimpan (log paling lama otomatis dibuang).</summary>
+    public int MaxCrawlRunsToKeep { get; set; } = 500;
+    /// <summary>
+    /// Real RSS/Atom feeds ingested live — semuanya media Indonesia (nasional + daerah, terverifikasi aktif).
+    /// Tambah/hapus dari Settings.
+    /// </summary>
     public List<string> RssFeeds { get; set; } = new()
     {
+        // Nasional
         "https://www.antaranews.com/rss/terkini.xml",
         "https://news.google.com/rss?hl=id&gl=ID&ceid=ID:id",
-        "https://feeds.bbci.co.uk/news/world/rss.xml"
+        "https://www.cnnindonesia.com/rss",
+        "https://rss.tempo.co/nasional",
+        "https://www.cnbcindonesia.com/news/rss",
+        "https://www.okezone.com/rss",
+        "https://news.detik.com/rss",
+        "https://www.sindonews.com/feed",
+        // Daerah — Jawa Barat & Banten
+        "https://www.radarbandung.id/feed",
+        "https://www.radarcirebon.id/feed",
+        "https://www.radarbanten.co.id/feed",
+        "https://jabarekspres.com/feed",
+        // Daerah — Jawa Tengah & Jawa Timur
+        "https://www.radarpekalongan.id/feed",
+        "https://www.beritajatim.com/feed",
+        "https://www.harianbhirawa.co.id/feed",
+        // Daerah — Sumatera
+        "https://redaksi.waspada.co.id/v2024/feed/",
+        "https://www.riaupos.co/feed",
+        "https://sumselupdate.com/feed",
+        // Daerah — Indonesia Timur
+        "https://www.radarmakassar.id/feed",
+        "https://www.radarambon.id/feed"
     };
-    public bool DarkWebMonitoring { get; set; } = true;
 }
 
 public class AlertingConfig
@@ -113,9 +154,10 @@ public class DarkWebConfig
 }
 
 /// <summary>
-/// Social-media & forum connector settings. Reddit and Mastodon work with no credentials
-/// (public APIs) and are on by default; YouTube/Twitter/Facebook/Threads/TikTok require the
-/// platform's API key/token — set them here and enable.
+/// Social-media & forum connector settings. Semua NONAKTIF secara default — pengumpulan hanya
+/// lewat RSS/Atom Indonesia + pencarian kata kunci Google News. Aktifkan connector sosial
+/// (Reddit, Mastodon, YouTube, Twitter/X, Facebook, Threads, TikTok) secara manual di Settings
+/// bila benar-benar dibutuhkan.
 /// </summary>
 public class SocialConfig
 {
@@ -130,16 +172,16 @@ public class SocialConfig
 
 public class RedditConfig
 {
-    public bool Enabled { get; set; } = true;                     // public JSON API, no auth
-    public List<string> Subreddits { get; set; } = new() { "worldnews", "indonesia", "cybersecurity" };
+    public bool Enabled { get; set; }                             // default OFF — nyalakan manual
+    public List<string> Subreddits { get; set; } = new() { "indonesia" };
     public int MaxPerSubreddit { get; set; } = 8;
 }
 
 public class MastodonConfig
 {
-    public bool Enabled { get; set; } = true;                     // public tag timelines, no auth
+    public bool Enabled { get; set; }                             // default OFF — nyalakan manual
     public string Instance { get; set; } = "https://mastodon.social";
-    public List<string> Hashtags { get; set; } = new() { "OSINT", "cybersecurity", "Indonesia" };
+    public List<string> Hashtags { get; set; } = new() { "Indonesia" };
     public int MaxPerHashtag { get; set; } = 8;
 }
 

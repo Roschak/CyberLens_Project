@@ -35,5 +35,5 @@ The slider at the bottom filters points to those published **up to** the selecte
 
 ## Notes
 
-- Only posts with coordinates appear. The simulated stream assigns realistic coordinates to ~70% of items; real RSS items get coordinates only if the feed provides them, so enable the sentiment layer with demo data to see a populated globe.
+- Only posts with coordinates appear. Coordinates are assigned by a lightweight geocoder whenever a known Indonesian city is mentioned in the item, so real news items still show up on the globe.
 - WebGL is required (any modern browser). The globe is dark by design regardless of the app light/dark theme.

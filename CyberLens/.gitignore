@@ -4,7 +4,10 @@ obj/
 publish/
 
 # Runtime data & secrets (created on first run)
-src/CyberLens/data/
+# NOTE: ignore the SQLite file only — the folder name `data/` must NOT be ignored
+# as a directory, or it silently swallows the source folder `Data/` on Windows
+# (case-insensitive matching) and the database/entity layer never gets committed.
+src/CyberLens/data/cyberlens.db
 src/CyberLens/config/
 src/CyberLens/storage/
 

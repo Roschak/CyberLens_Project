@@ -52,7 +52,7 @@ public class YouTubeConnector(IHttpClientFactory httpFactory) : ISocialConnector
                     PublishedAt: DateTime.TryParse(Str(sn, "publishedAt"), out var dt) ? dt.ToUniversalTime() : DateTime.UtcNow,
                     Language: "id",
                     Lat: geo?.Lat, Lon: geo?.Lon, Location: geo?.Name,
-                    Media: vid is null ? null : (MediaKind.Video, $"https://youtube.com/watch?v={vid}")));
+                    Media: vid is null ? null : (MediaType.Video, $"https://youtube.com/watch?v={vid}")));
             }
         }
         return items;

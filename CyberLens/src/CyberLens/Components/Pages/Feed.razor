@@ -56,7 +56,7 @@ else
                     <div class="wrap" style="margin-bottom:10px">
                         @foreach (var m in p.Media)
                         {
-                            @if (m.Kind == MediaKind.Image)
+                            @if (m.Kind == MediaType.Image)
                             {
                                 <img src="@m.Url" style="max-width:100%;border:2px solid var(--line);border-radius:3px" loading="lazy" />
                             }

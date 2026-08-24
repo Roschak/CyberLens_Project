@@ -24,7 +24,7 @@ The sidebar is grouped into **Intel**, **Operasi**, and **Admin**. The top class
 
 **Globe 3D Intelijen** — interactive Three.js Earth mapping OSINT spatially: sentiment heatmap, source markers, event-cluster bubbles, a threat layer, and a timeline you can play. Drag to rotate, scroll to zoom, toggle layers from the header. See [globe.md](globe.md).
 
-**Dark Web** — simulated hidden-forum/marketplace findings (threat chatter, leaked-credential offers). Actor handles are partially redacted.
+**Dark Web** — real hidden-forum/marketplace findings (threat chatter, leaked-credential offers) once the Tor / threat-intel connector is configured in Settings. Actor handles are partially redacted.
 
 **Kata Kunci** (Analyst+) — add/enable/disable/remove watch keywords with a severity level. Detected keywords raise alerts.
 
@@ -32,7 +32,7 @@ The sidebar is grouped into **Intel**, **Operasi**, and **Admin**. The top class
 
 **Alert** — all keyword hits, filterable (all / unread / critical). Mark individual or all as read.
 
-**Sumber** — monitored sources with type, country, trust score, and post counts. Analysts/Admins get a **Crawl sekarang** button to run a live collection pass on demand (real RSS feeds + stream).
+**Sumber** — monitored sources with type, country, trust score, and post counts. Analysts/Admins get a **Crawl sekarang** button to run a live collection pass on demand (real RSS feeds + social APIs).
 
 **Laporan** — generate PDF or Excel reports (daily/weekly/monthly) on demand; download from the archive. Automatic reports are scheduled in Settings.
 

@@ -2,8 +2,8 @@ namespace CyberLens.Services.Collection;
 
 /// <summary>
 /// Scheduled data-collection worker. On each cycle it delegates to <see cref="CollectorService"/>
-/// (real RSS + real social connectors + optional simulated stream). The same collector powers the
-/// manual "Crawl sekarang" button, so scheduled and on-demand collection share one code path.
+/// (real RSS feeds + real social connectors). The same collector powers the manual "Crawl sekarang"
+/// button, so scheduled and on-demand collection share one code path.
 /// Keeps <see cref="CrawlerStatusService"/> in sync so the UI can show whether it is running.
 /// </summary>
 public class CrawlerService(

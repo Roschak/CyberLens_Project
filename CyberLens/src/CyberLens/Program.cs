@@ -32,7 +32,10 @@ builder.Services.AddDbContextFactory<CyberLensDbContext>((sp, options) =>
         default:
             var dataDir = Path.Combine(builder.Environment.ContentRootPath, "data");
             Directory.CreateDirectory(dataDir);
-            options.UseSqlite($"Data Source={Path.Combine(dataDir, "cyberlens.db")}");
+            // Busy timeout + shared cache: crawler, alert monitor, dan report scheduler menulis
+            // bersamaan — tanpa ini SQLite bisa memunculkan "database is locked" dan merusak data lain.
+            // (WAL diaktifkan via PRAGMA di DbSeeder agar berlaku untuk seluruh koneksi.)
+            options.UseSqlite($"Data Source={Path.Combine(dataDir, "cyberlens.db")};Default Timeout=30;Cache=Shared");
             break;
     }
 });
@@ -102,7 +105,7 @@ builder.Services.AddSwaggerGen(c => c.SwaggerDoc("v1", new()
 
 var app = builder.Build();
 
-// ---- Initialize database + seed sample data ----
+// ---- Initialize database + seed configuration (users, categories, sources, keywords) ----
 using (var scope = app.Services.CreateScope())
 {
     var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<CyberLensDbContext>>();

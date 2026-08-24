@@ -12,7 +12,7 @@ Dibangun dengan **Blazor Server (.NET 10)**, **D3.js**, dan **Semantic Kernel**,
 
 ## Fitur
 
-- **Pengumpulan data** — crawler **nyata & langsung** dengan framework connector: RSS/Atom (Antara, Google News ID, BBC World), **Reddit** dan **Mastodon** (nyata, tanpa key), plus **YouTube, Twitter/X, Facebook, Threads, TikTok** via API resmi (aktifkan + isi kredensial di Pengaturan), serta stream **simulasi** opsional untuk demo. Berjalan **terjadwal** (background) atau **manual** ("Crawl sekarang"). Setiap item dinormalisasi, dedup berdasarkan hash konten, diberi skor sentimen, diklasifikasi otomatis, diberi tag, dan digeokode.
+- **Pengumpulan data** — crawler **nyata & langsung** dengan framework connector: RSS/Atom (Antara, Google News ID, CNN Indonesia, Tempo, CNBC Indonesia, Okezone, Detik, Sindonews), **Reddit** dan **Mastodon** (nyata, tanpa key), plus **YouTube, Twitter/X, Facebook, Threads, TikTok** via API resmi (aktifkan + isi kredensial di Pengaturan). Berjalan **terjadwal** (background) atau **manual** ("Crawl sekarang"). Setiap item dinormalisasi, dedup berdasarkan hash konten, diberi skor sentimen, diklasifikasi otomatis, diberi tag, dan digeokode. **Tidak ada data simulasi** — semua yang tersimpan berasal dari feed/API nyata.
 - **Dashboard Crawler Ops** — statistik & log aktivitas pengumpulan dalam bentuk chart + tabel yang bisa difilter: jumlah run, item terkumpul, success rate, durasi rata-rata; chart item per hari, sukses/gagal, item per connector, dan lokasi teratas; filter berdasarkan periode, connector/sumber, status, dan trigger. **Indikator status crawler** (classification strip + banner) menunjukkan apakah crawler sedang berjalan, siaga, atau nonaktif.
 - **Pemrosesan** — analisis sentimen berbasis leksikon multi-bahasa (ID/EN) dengan penanganan negasi, klasifikasi topik berbasis kata kunci (Politik, Ekonomi, Keamanan, Teknologi, Sosial, Kesehatan, Lingkungan).
 - **Analisis & intelijen** — statistik dashboard, analisis tren, pemantauan kata kunci real-time, analisis jaringan entitas, analisis geospasial, dan **prediksi berbasis AI** (forecast volume regresi linear).
@@ -45,7 +45,7 @@ cd src/CyberLens
 dotnet run
 ```
 
-Buka URL yang tercetak (mis. `http://localhost:5009`). Saat pertama dijalankan, database dibuat dan diisi data sampel secara otomatis (default SQLite — tanpa konfigurasi).
+Buka URL yang tercetak (mis. `http://localhost:5009`). Saat pertama dijalankan, database dibuat otomatis dan diisi konfigurasi dasar (user demo, kategori, sumber, kata kunci) — **tanpa data sampel**; konten hanya datang dari crawler nyata (default SQLite — tanpa konfigurasi).
 
 ### Akun demo
 
@@ -93,7 +93,7 @@ Dokumentasi lengkap ada di [`docs/`](docs/):
 
 ## Catatan
 
-- Stream media sosial simulasi dan seluruh data sampel bersifat **fiktif**, untuk demonstrasi. Nonaktifkan di Pengaturan dan tambahkan feed RSS asli (atau integrasikan API media sosial nyata) untuk penggunaan produksi.
+- Pengumpulan data **hanya data nyata**: aplikasi menyimpan item dari feed RSS/Atom asli dan API media sosial nyata. Tidak ada stream simulasi dan tidak ada post sampel — pembersihan otomatis menghapus baris demo dari versi lama.
 - Isi API key provider AI yang valid di Pengaturan untuk mengaktifkan Bang Kevin.
 
 ## Kredit

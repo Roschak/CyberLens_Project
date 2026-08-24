@@ -9,6 +9,13 @@
     <button class="btn accent" @onclick="() => _adding = !_adding"><Icon Name="plus" Size="16" /> Tambah kata kunci</button>
 </PageHeader>
 
+<div class="card pad" style="margin-bottom:18px;box-shadow:var(--shadow-sm)">
+    <span class="mono" style="font-size:12px;color:var(--ink-mute)">
+        Setiap kata kunci <b>AKTIF</b> otomatis dicari di Google News Indonesia (RSS nyata) saat crawler jalan
+        dan memicu alert saat terdeteksi di berita baru — lihat kolom <b>Deteksi</b> &amp; <b>Post</b>.
+    </span>
+</div>
+
 @if (_adding)
 {
     <div class="card pad" style="margin-bottom:18px">
@@ -34,7 +41,7 @@
     <div class="tbl-wrap">
         <table class="tbl">
             <thead>
-                <tr><th>Kata Kunci</th><th>Severity</th><th>Deteksi</th><th>Real-time</th><th>Status</th><th></th></tr>
+                <tr><th>Kata Kunci</th><th>Severity</th><th>Deteksi (alert)</th><th>Post cocok</th><th>Real-time</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var k in _keywords)
@@ -43,6 +50,7 @@
                         <td style="font-weight:600">@k.Term</td>
                         <td><span class="badge @SevClass(k.Severity)">@k.Severity</span></td>
                         <td class="mono">@k.HitCount</td>
+                        <td class="mono">@(_matchCounts.GetValueOrDefault(k.Term.ToLowerInvariant()))</td>
                         <td>@(k.NotifyRealtime ? "✓" : "—")</td>
                         <td>
                             <button class="btn sm ghost" @onclick="() => Toggle(k)">
@@ -59,6 +67,7 @@
 
 @code {
     private List<WatchKeyword> _keywords = new();
+    private Dictionary<string, int> _matchCounts = new();
     private bool _adding;
     private string _newTerm = "";
     private string _newSeverity = "Warning";
@@ -69,6 +78,17 @@
     {
         await using var db = await DbFactory.CreateDbContextAsync();
         _keywords = await db.WatchKeywords.OrderByDescending(k => k.HitCount).ToListAsync();
+        // Jumlah post nyata yang memuat tiap keyword (kasus-insensitif) di seluruh DB.
+        var allTerms = _keywords.Select(k => k.Term.Trim().ToLowerInvariant()).Where(t => t.Length > 0).ToList();
+        _matchCounts = new();
+        if (allTerms.Count > 0)
+        {
+            var content = await db.Posts.Select(p => p.Content).ToListAsync();
+            foreach (var t in allTerms)
+            {
+                _matchCounts[t] = content.Count(c => c.Contains(t, StringComparison.OrdinalIgnoreCase));
+            }
+        }
     }
 
     private async Task Add()

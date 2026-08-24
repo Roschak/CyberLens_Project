@@ -80,7 +80,7 @@ else
         {
             var added = await Collector.RunOnceAsync(Settings.Current, "Manual");
             _crawlMsg = added > 0
-                ? $"Pengumpulan selesai — {added} item baru masuk (RSS langsung + stream)."
+                ? $"Pengumpulan selesai — {added} item baru masuk (RSS langsung + media sosial)."
                 : "Pengumpulan selesai — tidak ada item baru (kemungkinan sudah ada / feed tidak terjangkau).";
             await Load();
         }

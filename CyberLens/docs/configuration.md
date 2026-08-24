@@ -43,13 +43,19 @@ All operational settings live in **`config/cyberlens.settings.json`** and are ed
 | Key | Default | Notes |
 |-----|---------|-------|
 | `Enabled` | `true` | master switch |
-| `IntervalSeconds` | `45` | crawl cycle |
-| `SimulateSocialStreams` | `true` | demo mode; generates realistic simulated traffic |
-| `RssFeeds` | `[]` | real RSS/Atom feed URLs to ingest |
-| `DarkWebMonitoring` | `true` | include simulated dark-web sources |
+| `IntervalSeconds` | `120` | crawl cycle |
+| `Mode` | `DalamNegeri` | `DalamNegeri` (Indonesia only) \| `LuarNegeri` (global) |
+| `MaxItemsPerFeed` | `15` | max items taken from each feed/connector per cycle — bounds the volume of data scraped |
+| `MaxNewPostsPerCycle` | `200` | hard cap on NEW posts stored per crawl cycle; once reached the remaining feeds are skipped until the next cycle (active keywords get priority) |
+| `MaxContentLength` | `2000` | stored article text is truncated to this many characters — keeps the DB small and AI/token usage bounded |
+| `RetentionDays` | `30` | posts older than N days are auto-deleted each cycle (`0` = keep forever) |
+| `MaxCrawlRunsToKeep` | `500` | max rows kept in the Crawler Activity Log — the oldest entries are trimmed so the table never grows unbounded |
+| `RssFeeds` | 20 Indonesian feeds | real RSS/Atom feed URLs to ingest — 8 nasional (Antara, Google News ID, CNN Indonesia, Tempo, CNBC Indonesia, Okezone, Detik, Sindonews) + 12 media daerah (Radar Bandung/Cirebon/Banten/Pekalongan/Makassar/Ambon, Jabar Ekspres, Berita Jatim, Harian Bhirawa, Waspada Medan, Riau Pos, Sumsel Update) |
+
+> SQLite runs in **WAL mode** with a 30 s busy timeout so the crawler, alert monitor and report scheduler can write concurrently without `database is locked` errors.
 
 ### Social (social-media & forum connectors)
-Per-platform sub-objects under `Social`. Reddit and Mastodon need no credentials (on by default); the rest are off until you add the platform's key/token and enable them. See [crawler.md](crawler.md).
+Per-platform sub-objects under `Social`. **All are OFF by default** — only the Indonesian RSS feeds and active watch-keyword searches run. Enable a platform manually when needed (Reddit/Mastodon need no credentials; the API-keyed ones need their key/token). See [crawler.md](crawler.md).
 
 | Platform | Key fields | Credential |
 |----------|-----------|------------|
@@ -94,5 +100,7 @@ Off by default. See [crawler.md](crawler.md) → Dark web monitoring.
 1. Set a real database and storage provider.
 2. Set a strong `Api.ApiKey`.
 3. Set an AI provider key (or disable the chat).
-4. Turn off `SimulateSocialStreams` and add real `RssFeeds` (or integrate real social APIs).
+4. Add more real `RssFeeds` (or integrate real social APIs) as needed.
 5. Serve over HTTPS and change the demo user passwords.
+
+> There is no simulated/demo data anymore: collection only stores items from real RSS/Atom feeds and real social APIs. A legacy cleanup runs automatically at startup to remove any demo rows left by older versions.

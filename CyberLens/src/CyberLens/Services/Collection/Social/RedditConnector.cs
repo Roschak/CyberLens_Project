@@ -1,6 +1,7 @@
 using System.Text.Json;
 using CyberLens.Data;
 using CyberLens.Models;
+using CyberLens.Services.Analysis;
 
 namespace CyberLens.Services.Collection.Social;
 
@@ -49,7 +50,7 @@ public class RedditConnector(IHttpClientFactory httpFactory) : ISocialConnector
                     Content: text.Length > 4000 ? text[..4000] : text,
                     Url: "https://reddit.com" + Str(d, "permalink"),
                     PublishedAt: DateTimeOffset.FromUnixTimeSeconds((long)Num(d, "created_utc")).UtcDateTime,
-                    Language: "en",
+                    Language: LanguageDetector.Detect(title, body),
                     Likes: (int)Num(d, "ups"),
                     Comments: (int)Num(d, "num_comments"),
                     Lat: geo?.Lat, Lon: geo?.Lon, Location: geo?.Name));

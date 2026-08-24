@@ -17,7 +17,8 @@ The console prints the URL (e.g. `http://localhost:5009`). On first launch:
 
 1. `config/cyberlens.settings.json` is created with defaults.
 2. A SQLite database is created under `data/cyberlens.db`.
-3. Sample data is seeded (~1,800 posts, 6 users, 16 sources, keywords, alerts, entity network).
+3. Configuration is seeded (demo users, categories, sources, watch keywords). **No sample posts** — all content comes from the real crawler.
+4. A legacy cleanup removes any demo rows left by older versions (synthetic posts, entity graph, simulator logs, fake alerts).
 
 Log in with `admin` / `admin`.
 
@@ -29,7 +30,7 @@ dotnet publish -c Release -o ./publish
 ./publish/CyberLens        # or CyberLens.exe on Windows
 ```
 
-## Resetting the demo data
+## Resetting
 
 Stop the app, delete `data/cyberlens.db` (SQLite) and `config/cyberlens.settings.json`, then run again. For other databases, drop the database and restart.
 

@@ -14,7 +14,7 @@ public static class SimpleGeocoder
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
         var lower = text.ToLowerInvariant();
-        foreach (var c in SampleContent.Cities)
+        foreach (var c in SampleContent.Locations)
         {
             if (lower.Contains(c.Name.ToLowerInvariant()))
                 return (c.Lat + (Rng.NextDouble() - 0.5) * 0.2, c.Lon + (Rng.NextDouble() - 0.5) * 0.2, c.Name);

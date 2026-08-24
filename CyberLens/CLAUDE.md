@@ -16,7 +16,7 @@ dotnet run                   # run (prints URL, e.g. http://localhost:5009)
 dotnet publish -c Release -o ./publish
 ```
 
-- **First run** auto-creates the SQLite DB (`data/cyberlens.db`) and seeds ~1,800 posts + users via `Data/DbSeeder.cs`. Reset the demo by deleting `data/cyberlens.db` and `config/cyberlens.settings.json`.
+- **First run** auto-creates the SQLite DB (`data/cyberlens.db`) and seeds only configuration (users, categories, sources, watch keywords) via `Data/DbSeeder.cs` — no sample posts. A legacy cleanup in `DbSeeder` removes leftover demo rows (synthetic posts with `/item/` URLs, entity graph, simulator crawl logs, fake alerts) from older installs. Reset by deleting `data/cyberlens.db` and `config/cyberlens.settings.json`.
 - **Log in** with `admin` / `admin` (all demo passwords equal the username).
 - **No test project** exists. To verify changes, run the app and drive it: the login page is static SSR (form POST to `/auth/login`); pages need the interactive circuit. A headless-browser screenshot loop (puppeteer-core against installed Edge) is the way to verify charts/interactivity — see how the app was verified during initial build.
 - On Windows, `dotnet build` fails with a file lock if the app is still running — stop it first: `powershell -Command "Stop-Process -Name CyberLens -Force"`.
@@ -34,7 +34,7 @@ dotnet publish -c Release -o ./publish
 ## UI conventions
 
 - **Rendering**: global Interactive Server. Draw D3 charts (`wwwroot/js/charts.js`) and the Three.js globe (`wwwroot/js/globe.js`) in `OnAfterRenderAsync`, never in `OnInitialized` — JS can't run during prerender. `globe.js` is a Three.js **ES module** imported by full CDN URL with custom drag/zoom (no `OrbitControls`) so it needs no import map — do **not** add a second `<importmap>`, Blazor already emits one via `<ImportMap>`.
-- **Collection**: `CollectorService` (scoped) runs one pass over RSS + all enabled `ISocialConnector`s (`Services/Collection/Social/` — Reddit/Mastodon real w/o keys, YouTube/Twitter/Facebook/Threads/TikTok via official APIs gated on credentials in `AppConfig.Social`) + optional simulator, logging a `CrawlRun` per connector. `CrawlerService` (hosted) runs it scheduled; the Sources/Crawler pages "Crawl sekarang" button runs it manually (`trigger: "Manual"`). `CrawlerStatusService` (singleton) holds live running state for the strip indicator + `/crawler` dashboard; `CrawlLogService` queries the `CrawlRun` log. Adding a connector = implement `ISocialConnector` + register in Program.cs.
+- **Collection**: `CollectorService` (scoped) runs one pass over RSS + all enabled `ISocialConnector`s (`Services/Collection/Social/` — all **OFF by default**; enable in Settings) + **one Google News Indonesia search per active watch keyword** (`Keyword: <term>` connector), logging a `CrawlRun` per connector. There is **no simulated stream** — only real data is stored. `CrawlerService` (hosted) runs it scheduled; the Sources/Crawler pages "Crawl sekarang" button runs it manually (`trigger: "Manual"`). `CrawlerStatusService` (singleton) holds live running state for the strip indicator + `/crawler` dashboard; `CrawlLogService` queries the `CrawlRun` log. Adding a connector = implement `ISocialConnector` + register in Program.cs.
 - **Design system** is entirely in `wwwroot/app.css` (neo-brutalism: hard offset shadows, CSS-variable theming with `data-theme`). Chart colors come from the validated dataviz reference palette baked into `charts.js` (light/dark arrays) — don't hand-pick chart hues.
 - **Auth**: `Components/Pages/_Imports.razor` applies `[Authorize]` to all pages; `Login.razor`/`NotFound.razor` use `[AllowAnonymous]`; admin pages (`Users`, `Audit`, `Settings`) add `[Authorize(Roles = "Admin")]`.
 - **Razor gotchas hit during build**: a `@inject` member name must not equal the component's own class name (e.g. page `Chat` can't inject a member named `Chat` → use `ChatSvc`). Wrap `new` expressions in Razor markup as `@(new ...)`. Each page owns its title via `<PageHeader>`; the layout topbar is action-only.
@@ -62,5 +62,5 @@ src/CyberLens/
 
 ## Notes
 
-- Sample data and the simulated social stream are **fictional demo data**. Disable `Crawler.SimulateSocialStreams` and add real `Crawler.RssFeeds` for real use.
+- Collection is **real-data only**: RSS/Atom feeds (20 Indonesian feeds by default — 8 nasional + 12 media daerah) + Google News Indonesia keyword search + real social APIs (all social connectors OFF by default). No simulated stream, no sample posts.
 - `<NoWarn>` in the csproj suppresses Semantic Kernel experimental warnings (`SKEXP*`).

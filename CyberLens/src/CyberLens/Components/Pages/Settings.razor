@@ -117,9 +117,21 @@
         <div class="card-h"><span class="field">// collection</span><h3>Crawler &amp; Alert</h3></div>
         <div class="card-b">
             <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Crawler.Enabled" /> &nbsp;Aktifkan crawler</label></div>
-            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Crawler.SimulateSocialStreams" /> &nbsp;Simulasikan stream media sosial (demo)</label></div>
-            <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Crawler.DarkWebMonitoring" /> &nbsp;Pemantauan dark web</label></div>
+            <div class="field-row">
+                <label class="fld">Cakupan berita</label>
+                <div class="wrap">
+                    <label class="row"><input type="radio" name="crawler-mode" checked="@(_c.Crawler.Mode == CrawlerMode.DalamNegeri)" @onchange="() => _c.Crawler.Mode = CrawlerMode.DalamNegeri" /> &nbsp;Dalam Negeri (Indonesia saja)</label>
+                    <label class="row"><input type="radio" name="crawler-mode" checked="@(_c.Crawler.Mode == CrawlerMode.LuarNegeri)" @onchange="() => _c.Crawler.Mode = CrawlerMode.LuarNegeri" /> &nbsp;Luar Negeri (Indonesia + dunia)</label>
+                </div>
+            </div>
+            <div class="mono" style="font-size:11px;color:var(--ink-mute)">Mode <b>Dalam Negeri</b> melewati media luar negeri (mis. BBC) dan hanya menyimpan konten berbahasa Indonesia. Mode <b>Luar Negeri</b> juga mengambil berita global. Tidak ada data simulasi — semua konten berasal dari feed & API nyata.</div>
             <div class="field-row"><label class="fld">Interval crawler (detik)</label><input class="inp" type="number" @bind="_c.Crawler.IntervalSeconds" /></div>
+            <div class="field-row"><label class="fld">Maks. item per feed / connector</label><input class="inp" type="number" min="1" @bind="_c.Crawler.MaxItemsPerFeed" /></div>
+            <div class="field-row"><label class="fld">Maks. post baru per siklus</label><input class="inp" type="number" min="10" @bind="_c.Crawler.MaxNewPostsPerCycle" /></div>
+            <div class="field-row"><label class="fld">Maks. panjang teks berita (karakter)</label><input class="inp" type="number" min="500" @bind="_c.Crawler.MaxContentLength" /></div>
+            <div class="field-row"><label class="fld">Hapus post lebih tua dari (hari, 0=nonaktif)</label><input class="inp" type="number" min="0" @bind="_c.Crawler.RetentionDays" /></div>
+            <div class="field-row"><label class="fld">Maks. baris Log Aktivitas Crawler disimpan</label><input class="inp" type="number" min="10" @bind="_c.Crawler.MaxCrawlRunsToKeep" /></div>
+            <div class="mono" style="font-size:11px;color:var(--ink-mute)">Batas ini menjaga volume data tetap terkendali agar tidak terjadi konflik kunci database / token yang membuat fitur lain error.</div>
             <div class="field-row"><label class="fld">RSS feeds (satu per baris)</label><textarea class="inp" rows="3" @bind="_rssText"></textarea></div>
             <div class="field-row"><label class="row"><input type="checkbox" @bind="_c.Alerting.Enabled" /> &nbsp;Aktifkan pemantauan alert real-time</label></div>
         </div>

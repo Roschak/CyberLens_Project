@@ -20,7 +20,7 @@ public record CollectedItem(
     double? Lat = null,
     double? Lon = null,
     string? Location = null,
-    (MediaKind Kind, string Url)? Media = null);
+    (MediaType Kind, string Url)? Media = null);
 
 /// <summary>
 /// A pluggable crawler for one external platform (social media, forum, etc.).
