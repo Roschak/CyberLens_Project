@@ -42,8 +42,17 @@ builder.Services.AddDbContextFactory<CyberLensDbContext>((sp, options) =>
 
 // ---- Core services ----
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddHttpClient("crawler", c => c.Timeout = TimeSpan.FromSeconds(20));
-builder.Services.AddHttpClient("web", c => c.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddHttpClient("crawler", c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(25);
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 (CyberLens-OSINT/1.0)");
+    c.DefaultRequestHeaders.Accept.ParseAdd("application/rss+xml, application/xml, application/atom+xml, text/xml, */*");
+});
+builder.Services.AddHttpClient("web", c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(30);
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 (CyberLens-OSINT/1.0)");
+});
 builder.Services.AddHttpClient("ai", c => c.Timeout = TimeSpan.FromMinutes(5));
 
 builder.Services.AddSingleton<StorageService>();

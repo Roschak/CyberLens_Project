@@ -142,7 +142,108 @@ public class AnalyticsService(IDbContextFactory<CyberLensDbContext> dbFactory)
             .Select(n => new GraphNode(n.Id, n.Name, n.Kind.ToString(), n.Mentions)).ToListAsync();
         var links = await db.EntityLinks
             .Select(l => new GraphLink(l.SourceNodeId, l.TargetNodeId, l.Weight, l.RelationType)).ToListAsync();
-        return new NetworkGraph(nodes, links);
+
+        if (nodes.Count > 0)
+            return new NetworkGraph(nodes, links);
+
+        // Jika EntityNodes kosong, bangun graf jaringan secara dinamis dari post nyata:
+        // Sumber (Organization) -> Kategori (Account) -> Tag (Hashtag) -> Lokasi (Location)
+        return await BuildDynamicNetworkGraphAsync(db);
+    }
+
+    private static async Task<NetworkGraph> BuildDynamicNetworkGraphAsync(CyberLensDbContext db)
+    {
+        var posts = await db.Posts
+            .Include(p => p.Source)
+            .Include(p => p.Category)
+            .OrderByDescending(p => p.PublishedAt)
+            .Take(250)
+            .ToListAsync();
+
+        if (posts.Count == 0)
+            return new NetworkGraph(new List<GraphNode>(), new List<GraphLink>());
+
+        var nodeList = new List<GraphNode>();
+        var nodeIdMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var nextId = 1;
+
+        int GetOrAddNode(string name, string kind, int mentions = 1)
+        {
+            if (nodeIdMap.TryGetValue(name, out var id))
+            {
+                var idx = nodeList.FindIndex(n => n.Id == id);
+                if (idx >= 0)
+                {
+                    var existing = nodeList[idx];
+                    nodeList[idx] = new GraphNode(existing.Id, existing.Name, existing.Kind, existing.Mentions + mentions);
+                }
+                return id;
+            }
+            var newId = nextId++;
+            nodeIdMap[name] = newId;
+            nodeList.Add(new GraphNode(newId, name, kind, mentions));
+            return newId;
+        }
+
+        var linkWeights = new Dictionary<(int, int), int>();
+
+        foreach (var p in posts)
+        {
+            var srcName = p.Source?.Name;
+            var catName = p.Category?.Name;
+            int? srcId = null;
+            int? catId = null;
+
+            if (!string.IsNullOrWhiteSpace(srcName))
+                srcId = GetOrAddNode(srcName, "Organization");
+
+            if (!string.IsNullOrWhiteSpace(catName))
+                catId = GetOrAddNode(catName, "Account");
+
+            if (srcId.HasValue && catId.HasValue)
+            {
+                var key = (srcId.Value, catId.Value);
+                linkWeights[key] = linkWeights.GetValueOrDefault(key) + 1;
+            }
+
+            if (!string.IsNullOrWhiteSpace(p.LocationName))
+            {
+                var locId = GetOrAddNode(p.LocationName, "Location");
+                if (catId.HasValue)
+                {
+                    var key = (catId.Value, locId);
+                    linkWeights[key] = linkWeights.GetValueOrDefault(key) + 1;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(p.Tags))
+            {
+                var tags = p.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Take(3);
+                foreach (var tag in tags)
+                {
+                    if (tag.Length < 3) continue;
+                    var tagId = GetOrAddNode("#" + tag, "Hashtag");
+                    if (catId.HasValue)
+                    {
+                        var key = (catId.Value, tagId);
+                        linkWeights[key] = linkWeights.GetValueOrDefault(key) + 1;
+                    }
+                    if (srcId.HasValue)
+                    {
+                        var key = (srcId.Value, tagId);
+                        linkWeights[key] = linkWeights.GetValueOrDefault(key) + 1;
+                    }
+                }
+            }
+        }
+
+        var linkList = linkWeights
+            .Select(kv => new GraphLink(kv.Key.Item1, kv.Key.Item2, Math.Min(kv.Value, 15), "relasi"))
+            .Take(100)
+            .ToList();
+
+        return new NetworkGraph(nodeList.Take(50).ToList(), linkList);
     }
 
     public async Task<List<GeoPoint>> GetGeoPointsAsync(int days = 30)

@@ -34,7 +34,9 @@ public class CollectorService(
     private static bool IsKeywordRelevant(string title, string content, string keyword)
     {
         var combined = $"{title} {content}";
-        return combined.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+        if (combined.Contains(keyword, StringComparison.OrdinalIgnoreCase)) return true;
+        var parts = keyword.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length > 1 && parts.All(p => combined.Contains(p, StringComparison.OrdinalIgnoreCase));
     }
     public async Task<int> RunOnceAsync(AppConfig cfg, string trigger = "Scheduled", CancellationToken ct = default)
     {
@@ -141,8 +143,8 @@ public class CollectorService(
             using var cts = perConnectorTimeout.HasValue
                 ? CancellationTokenSource.CreateLinkedTokenSource(ct)
                 : null;
-            if (cts is not null)
-                cts.CancelAfter(perConnectorTimeout.Value);
+            if (cts is not null && perConnectorTimeout is { } timeout)
+                cts.CancelAfter(timeout);
             var token = cts?.Token ?? ct;
 
             IReadOnlyList<CollectedItem> items = Array.Empty<CollectedItem>();
@@ -161,7 +163,7 @@ public class CollectorService(
                     if (attempt < retryCount)
                     {
                         var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt + 1)); // exponential backoff
-                        logger.LogWarning(ex, "Connector {Name} attempt {Attempt}/{Max} gagal, retry dalam {Delay}s", name, attempt + 1, retryCount + 1, delay.TotalSeconds);
+                        logger.LogDebug("Connector {Name} attempt {Attempt}/{Max} gagal ({Error}), retry dalam {Delay}s", name, attempt + 1, retryCount + 1, ex.Message, delay.TotalSeconds);
                         await Task.Delay(delay, token);
                     }
                 }
@@ -171,7 +173,7 @@ public class CollectorService(
             (added, dup) = await StoreItemsAsync(items, ct, maxContentLength);
         }
         catch (OperationCanceledException) { throw; }
-        catch (Exception ex) { ok = false; err = ex.Message; logger.LogWarning(ex, "Connector {Name} failed", name); }
+        catch (Exception ex) { ok = false; err = ex.Message; logger.LogWarning("Connector {Name} gagal: {Error}", name, ex.Message); }
         sw.Stop();
         await LogRunAsync(name, kind, trigger, started, sw.Elapsed, found, added, dup, ok, err);
         return added;
@@ -302,7 +304,7 @@ public class CollectorService(
                 {
                     db.Posts.RemoveRange(old);
                     await db.SaveChangesAsync(ct);
-                    logger.LogInformation("Retensi: {Count} post lebih tua dari {Days} hari dihapus", old.Count, crawler.RetentionDays);
+                    logger.LogDebug("Retensi: {Count} post lebih tua dari {Days} hari dihapus", old.Count, crawler.RetentionDays);
                 }
             }
 
@@ -313,7 +315,7 @@ public class CollectorService(
             {
                 db.CrawlRuns.RemoveRange(excess);
                 await db.SaveChangesAsync(ct);
-                logger.LogInformation("Retensi: {Count} baris log crawler lama dibuang (maks {Keep} disimpan)", excess.Count, keep);
+                logger.LogDebug("Retensi: {Count} baris log crawler lama dibuang (maks {Keep} disimpan)", excess.Count, keep);
             }
 
             // Bersihkan sumber (Source) yang tidak lagi memiliki post apa pun — menjaga
@@ -327,7 +329,7 @@ public class CollectorService(
             {
                 db.Sources.RemoveRange(orphanSources);
                 await db.SaveChangesAsync(ct);
-                logger.LogInformation("Retensi: {Count} sumber tanpa post dihapus", orphanSources.Count);
+                logger.LogDebug("Retensi: {Count} sumber tanpa post dihapus", orphanSources.Count);
             }
         }
         catch { /* pembersihan tidak boleh menggagalkan siklus crawler */ }
@@ -345,8 +347,10 @@ public class CollectorService(
             return Array.Empty<CollectedItem>();
         }
         using var respClean = resp;
-        await using var stream = await respClean.Content.ReadAsStreamAsync(ct);
-        using var reader = XmlReader.Create(stream, new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore });
+        var bytes = await respClean.Content.ReadAsByteArrayAsync(ct);
+        var xmlStr = System.Text.Encoding.UTF8.GetString(bytes).TrimStart();
+        using var strReader = new StringReader(xmlStr);
+        using var reader = XmlReader.Create(strReader, new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore });
         var feed = SyndicationFeed.Load(reader);
         if (feed is null) return Array.Empty<CollectedItem>();
         var host = TryHost(feedUrl);

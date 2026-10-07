@@ -47,7 +47,7 @@ public class CrawlerService(
             catch (Exception ex)
             {
                 _consecutiveFailures++;
-                logger.LogWarning(ex, "Crawler cycle failed (consecutive={Count})", _consecutiveFailures);
+                logger.LogWarning("Crawler cycle failed ({Count} consecutive): {Error}", _consecutiveFailures, ex.Message);
 
                 // Circuit breaker: matikan crawler setelah N kegagalan berturut-turut
                 var maxFailures = Math.Max(3, cfg.Crawler.MaxConsecutiveFailures);

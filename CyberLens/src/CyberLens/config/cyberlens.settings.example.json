@@ -1,0 +1,155 @@
+{
+  "Database": {
+    "Provider": "SQLite",
+    "SQLite": "Data Source=data/cyberlens.db",
+    "SqlServer": "Server=localhost;Database=CyberLens;Trusted_Connection=True;TrustServerCertificate=True",
+    "MySql": "Server=localhost;Database=cyberlens;User=root;Password=;",
+    "PostgreSql": "Host=localhost;Database=cyberlens;Username=postgres;Password="
+  },
+  "Storage": {
+    "Provider": "FileSystem",
+    "FileSystemRoot": "storage",
+    "AzureBlobConnectionString": "",
+    "AzureBlobContainer": "cyberlens",
+    "S3AccessKey": "",
+    "S3SecretKey": "",
+    "S3Region": "us-east-1",
+    "S3Bucket": "cyberlens",
+    "MinioEndpoint": "http://localhost:9000",
+    "MinioAccessKey": "",
+    "MinioSecretKey": "",
+    "MinioBucket": "cyberlens"
+  },
+  "Ai": {
+    "Provider": "OpenAI",
+    "SystemPrompt": "Kamu adalah 'Bang Kevin', asisten intelijen sumber terbuka (OSINT) untuk platform CyberLens. Kamu ramah, ringkas, dan profesional; jawab dalam bahasa yang dipakai pengguna (Indonesia atau Inggris). Gunakan function/tools yang tersedia untuk menjawab pertanyaan tentang data pemantauan media (posts, sentimen, tren, kata kunci, sumber, alert, jaringan entitas) dan untuk mencari informasi di internet bila diperlukan. Selalu sebutkan angka dan fakta dari hasil tools, jangan mengarang data. Format jawaban dengan Markdown yang rapi.",
+    "Temperature": 0.7,
+    "MaxTokens": 2048,
+    "OpenAIApiKey": "",
+    "OpenAIModel": "gpt-4o-mini",
+    "AnthropicApiKey": "",
+    "AnthropicModel": "claude-sonnet-5",
+    "GeminiApiKey": "",
+    "GeminiModel": "gemini-2.0-flash",
+    "OllamaEndpoint": "http://localhost:11434",
+    "OllamaModel": "llama3.1"
+  },
+  "Tavily": {
+    "ApiKey": ""
+  },
+  "Crawler": {
+    "Enabled": true,
+    "IntervalSeconds": 120,
+    "Mode": 0,
+    "MaxItemsPerFeed": 15,
+    "MaxNewPostsPerCycle": 200,
+    "MaxContentLength": 2000,
+    "RetentionDays": 30,
+    "MaxCrawlRunsToKeep": 500,
+    "MaxConsecutiveFailures": 10,
+    "RetryCount": 2,
+    "RequestTimeoutSeconds": 30,
+    "MaxItemsPerKeyword": 10,
+    "MaxNewPostsPerCycleKeyword": 50,
+    "MaxConnectorsPerCycle": 30,
+    "RssFeeds": [
+      "https://www.antaranews.com/rss/terkini.xml",
+      "https://news.google.com/rss?hl=id&gl=ID&ceid=ID:id",
+      "https://www.cnnindonesia.com/rss",
+      "https://rss.tempo.co/nasional",
+      "https://www.cnbcindonesia.com/news/rss",
+      "https://www.okezone.com/rss",
+      "https://news.detik.com/rss",
+      "https://www.sindonews.com/feed",
+      "https://www.radarbandung.id/feed",
+      "https://www.radarcirebon.id/feed",
+      "https://www.radarbanten.co.id/feed",
+      "https://jabarekspres.com/feed",
+      "https://www.radarpekalongan.id/feed",
+      "https://www.beritajatim.com/feed",
+      "https://www.harianbhirawa.co.id/feed",
+      "https://redaksi.waspada.co.id/v2024/feed/",
+      "https://www.riaupos.co/feed",
+      "https://sumselupdate.com/feed",
+      "https://www.radarmakassar.id/feed",
+      "https://www.radarambon.id/feed"
+    ]
+  },
+  "Social": {
+    "Reddit": {
+      "Enabled": false,
+      "Subreddits": [
+        "indonesia"
+      ],
+      "MaxPerSubreddit": 8
+    },
+    "Mastodon": {
+      "Enabled": false,
+      "Instance": "https://mastodon.social",
+      "Hashtags": [
+        "Indonesia"
+      ],
+      "MaxPerHashtag": 8
+    },
+    "YouTube": {
+      "Enabled": false,
+      "ApiKey": "",
+      "SearchTerms": [
+        "keamanan siber",
+        "OSINT"
+      ],
+      "MaxResults": 8
+    },
+    "Twitter": {
+      "Enabled": false,
+      "BearerToken": "",
+      "SearchTerms": [
+        "ransomware",
+        "kebocoran data"
+      ],
+      "MaxResults": 10
+    },
+    "Facebook": {
+      "Enabled": false,
+      "AccessToken": "",
+      "PageIds": [],
+      "MaxPerPage": 10
+    },
+    "Threads": {
+      "Enabled": false,
+      "AccessToken": "",
+      "UserId": "me",
+      "MaxResults": 10
+    },
+    "TikTok": {
+      "Enabled": false,
+      "ClientKey": "",
+      "ClientSecret": "",
+      "SearchTerms": [
+        "berita"
+      ],
+      "MaxResults": 10
+    }
+  },
+  "DarkWeb": {
+    "Enabled": false,
+    "TorProxy": "socks5://127.0.0.1:9050",
+    "OnionUrls": [],
+    "ThreatIntelApiUrl": "",
+    "ThreatIntelApiKey": "",
+    "MaxPerSource": 10
+  },
+  "Alerting": {
+    "Enabled": true,
+    "ScanIntervalSeconds": 20
+  },
+  "Api": {
+    "Enabled": true,
+    "ApiKey": "cyberlens-demo-key"
+  },
+  "Reporting": {
+    "AutoDaily": true,
+    "AutoWeekly": true,
+    "AutoMonthly": true
+  }
+}

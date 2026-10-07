@@ -50,7 +50,22 @@ else
                     </div>
                     <span class="badge @SentBadge(p.SentimentLabel)"><span class="d" style="background:@SentColor(p.SentimentLabel)"></span>@p.SentimentLabel</span>
                 </div>
-                <div style="font-size:14px;line-height:1.5;margin-bottom:10px">@p.Content</div>
+                @if (!string.IsNullOrWhiteSpace(p.Title))
+                {
+                    <h4 style="margin:0 0 6px;font-size:15px;line-height:1.3;font-weight:700">
+                        @if (!string.IsNullOrWhiteSpace(p.Url))
+                        {
+                            <a href="@p.Url" target="_blank" rel="noopener noreferrer" style="color:var(--ink);text-decoration:none">
+                                @p.Title <Icon Name="external-link" Size="12" />
+                            </a>
+                        }
+                        else
+                        {
+                            @p.Title
+                        }
+                    </h4>
+                }
+                <div style="font-size:13.5px;line-height:1.5;margin-bottom:10px;color:var(--ink-soft)">@p.Content</div>
                 @if (p.Media.Any())
                 {
                     <div class="wrap" style="margin-bottom:10px">
